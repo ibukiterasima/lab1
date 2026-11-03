@@ -63,6 +63,9 @@ button.danger,.danger{background:#b5593a;color:#fff}
 .stg button{padding:0;min-height:0;background:none;border-radius:24px}
 .stg img,.stamp{width:100%;aspect-ratio:1;object-fit:cover;border-radius:24px;display:block}
 .stamp{width:7rem}.m.pending{opacity:.6}
+.rd{display:flex;justify-content:flex-end;gap:4px;font-size:.7rem;min-height:.9rem}
+.m:not(.me) .rd{justify-content:flex-start}
+.rd .ic,.rd .av{width:1.2em;height:1.2em;margin:0;vertical-align:baseline}
 </style>
 </head>
 <body>
@@ -175,8 +178,8 @@ function familyView() {
 function homeView() {
   set(`<div class="row"><h2>${av(fam.my.icon)} ${esc(fam.my.display_name)}さん</h2><span>${esc(fam.name)}</span></div>
     <div class="card clock"><div class="t" id="tm"></div><div class="d" id="dt"></div></div>
-    <div class="card"><h2>${ic("calendar")} 今日の予定</h2><div id="today">読み込み中…</div></div>
-    <div class="card"><h2>${ic("chat")} いちばん新しいメッセージ</h2><div id="last">読み込み中…</div></div>
+    <div class="card"><h2>${ic("calendar")} 今日の予定</h2><div id="today">${homeCache.today || "読み込み中…"}</div></div>
+    <div class="card"><h2>${ic("chat")} いちばん新しいメッセージ</h2><div id="last">${homeCache.last || "読み込み中…"}</div></div>
     <div class="big"><button id="chat">${ic("chat")} 家族とおしゃべり</button>
     <button id="ph">${ic("camera")} 家族の写真</button>
     <button id="cl">${ic("calendar")} 家族の予定</button>
@@ -189,16 +192,12 @@ function homeView() {
     $("#dt").textContent = n.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
   };
   draw(); tick = setInterval(draw, 1000);
-  sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(1).then(({ data }) => {
-    const m = data && data[0];
-    $("#last").innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body || (m.stamp ? "スタンプを送りました" : "写真を送りました"))}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
-  });
+  paintLast();
   $("#chat").onclick = chatView;
   $("#ph").onclick = photoView;
   $("#cl").onclick = () => calView(); $("#st").onclick = settingsView;
-  onLive = t => { if (t === "members") homeView(); else if (t === "events") paintToday(); else if (t === "messages") paintLast(); };
-  { const t = new Date(), a = new Date(t.getFullYear(), t.getMonth(), t.getDate());
-    evq(a, addDays(a, 1)).then(({ data }) => { $("#today").innerHTML = (data && data.length) ? data.map(e => `<div><b>${hm(e.starts_at)}</b> ${esc(e.title)} <small>(${esc(who(e))})</small></div>`).join("") : "今日の予定はありません。"; }); }
+  onLive = t => { if (t === "members") homeView(); else if (t === "events") paintToday(); else if (t === "messages") paintLast(); else if (t === "resume") { paintToday(); paintLast(); } };
+  paintToday();
   $("#lo").onclick = async () => { killLive(); try { localStorage.removeItem("em"); } catch (e) {} await sb.auth.signOut(); me = null; authView(); };
   $("#inv").onclick = async () => {
     const { data } = await sb.rpc("my_invite_code", { fid: fam.id });
@@ -211,22 +210,35 @@ async function chatView() {
     <div class="card" style="padding:12px"><div id="log"></div></div>
     <p class="hide" id="hint">いまは、写真とスタンプだけ送れます。</p><div class="card hide" id="tray"><div class="stg" id="stg"></div></div>
     <div class="send" id="bar"><input id="ci" type="file" accept="image/*" class="hide"><button class="sub" id="cb" aria-label="写真を送る">${ic("camera")}<span class="lb">写真</span></button><button class="sub" id="sk" aria-label="スタンプを送る">${ic("smile")}<span class="lb">スタンプ</span></button><input id="tx" maxlength="1000" placeholder="メッセージを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
-  const log = $("#log"), seen = new Set();
+  const log = $("#log"), seen = new Set(), reads = {}, msgs = {}; let top = 0, ready = false;
   const paintComposer = () => { $("#tx").classList.toggle("hide", !fam.textOn); $("#sd").classList.toggle("hide", !fam.textOn);
     $("#bar").classList.toggle("notext", !fam.textOn); $("#hint").classList.toggle("hide", fam.textOn); };
   paintComposer();
-  onLive = t => { if (t === "families") paintComposer(); };
+  const mark = () => { if (document.visibilityState === "visible" && top) sb.rpc("mark_read", { fid: fam.id, mid: top }); };
+  const rdHtml = m => Object.values(members).filter(u => u.user_id !== m.user_id && u.user_id !== me.id && (reads[u.user_id] || 0) >= m.id)
+    .map(u => `<span aria-label="${esc(u.display_name)}さんが見ました" title="${esc(u.display_name)}">${av(u.icon)}</span>`).join("");
+  const paintReads = () => log.querySelectorAll(".m[data-id]").forEach(el => { const m = msgs[el.dataset.id]; if (m) el.querySelector(".rd").innerHTML = rdHtml(m); });
+  const loadReads = async () => { const r = await sb.from("message_reads").select("user_id, last_id").eq("family_id", fam.id); (r.data || []).forEach(x => reads[x.user_id] = x.last_id); };
+  onLive = (t, pl) => { if (t === "families") paintComposer(); else if (t === "message_reads") { reads[pl.new.user_id] = pl.new.last_id; paintReads(); }
+    else if (t === "members") paintReads(); else if (t === "resume") loadNew(); };
   $("#stg").innerHTML = Array.from({ length: 13 }, (_, i) => `<button data-n="${i + 1}" aria-label="スタンプ${i + 1}"><img src="${i + 1}.png" alt="スタンプ${i + 1}"></button>`).join("");
   const add = m => {
-    if (seen.has(m.id)) return; seen.add(m.id);
+    if (seen.has(m.id)) return; seen.add(m.id); msgs[m.id] = m;
+    if (m.id > top) { top = m.id; if (ready) mark(); }
     const mine = m.user_id === me.id, u = members[m.user_id] || { display_name: "家族", icon: "smile" };
     const t = new Date(m.created_at).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
-    log.insertAdjacentHTML("beforeend", `<div class="m ${mine ? "me" : ""}"><div class="who">${av(u.icon)} ${esc(u.display_name)}</div><div class="b">${m.body ? esc(m.body) : ""}${m.stamp ? `<img class="stamp" src="${m.stamp}.png" alt="スタンプ">` : ""}${m.photo_path ? `<img class="cimg" data-p="${esc(m.photo_path)}" alt="送られた写真(押すと大きく見られます)">` : ""}</div><div class="tm">${t}</div></div>`);
+    log.insertAdjacentHTML("beforeend", `<div class="m ${mine ? "me" : ""}" data-id="${m.id}"><div class="who">${av(u.icon)} ${esc(u.display_name)}</div><div class="b">${m.body ? esc(m.body) : ""}${m.stamp ? `<img class="stamp" src="${m.stamp}.png" alt="スタンプ">` : ""}${m.photo_path ? `<img class="cimg" data-p="${esc(m.photo_path)}" alt="送られた写真(押すと大きく見られます)">` : ""}</div><div class="tm">${t}</div><div class="rd">${rdHtml(m)}</div></div>`);
     if (m.photo_path) { const im = log.lastElementChild.querySelector(".cimg"); signed(m.photo_path).then(u => { im.src = u; log.scrollTop = log.scrollHeight; }); }
     log.scrollTop = log.scrollHeight;
   };
+  await loadReads();
   const { data } = await sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(50);
   (data || []).reverse().forEach(add);
+  ready = true; mark();
+  const loadNew = async () => {
+    const r = await sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(50);
+    await loadReads(); (r.data || []).reverse().forEach(add); paintReads(); mark();
+  };
   chan = sb.channel("chat-" + fam.id).on("postgres_changes",
     { event: "INSERT", schema: "public", table: "messages", filter: "family_id=eq." + fam.id }, p => add(p.new)).subscribe();
   const post = async (fields, html, restore) => {
@@ -293,7 +305,7 @@ async function photoView() {
     }
     photoView();
   };
-  onLive = t => { if (t === "photos" || t === "members") photoView(); };
+  onLive = t => { if (t === "photos" || t === "members" || t === "resume") photoView(); };
   const { data } = await sb.from("photos").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(60);
   const gr = $("#gr");
   if (!data || !data.length) return gr.textContent = "まだ写真がありません。最初の1枚をのせてみましょう。";
@@ -312,7 +324,7 @@ async function photoDetail(p, url) {
     <div class="send"><input id="tx" maxlength="500" placeholder="コメントを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
   $("#bk").onclick = photoView;
   $("#dl").onclick = () => saveToPhone(url);
-  onLive = (t, pl) => { if (t === "photo_comments" || t === "members") draw(); else if (t === "photos" && pl.eventType === "DELETE" && pl.old.id === p.id) photoView(); };
+  onLive = (t, pl) => { if (t === "photo_comments" || t === "members" || t === "resume") draw(); else if (t === "photos" && pl.eventType === "DELETE" && pl.old.id === p.id) photoView(); };
   if ($("#rm")) $("#rm").onclick = async () => {
     if (!await ask("この写真をけしますか?", "けす")) return;
     await sb.from("photos").delete().eq("id", p.id);
@@ -352,7 +364,7 @@ async function calView(cur = new Date(), rng = null) {
     <div class="card"><h2>${esc(rng.label)}の予定</h2><div id="ls">読み込み中…</div></div>
     <button id="ad">${ic("plus")} 予定を入れる</button>`);
   $("#bk").onclick = goHome;
-  onLive = t => { if (t === "events" || t === "members") calView(cur, rng); };
+  onLive = t => { if (t === "events" || t === "members" || t === "resume") calView(cur, rng); };
   $("#pv").onclick = () => calView(new Date(y, m - 1, 1));
   $("#nx").onclick = () => calView(new Date(y, m + 1, 1));
   $("#ad").onclick = () => eventForm(null, ymd(rng.a));
@@ -456,7 +468,7 @@ function settingsView() {
 }
 
 let liveCh = null, liveFam = null, onLive = null;
-function killLive() { Object.keys(sig).forEach(k => delete sig[k]); avUrl = {}; if (liveCh) sb.removeChannel(liveCh); liveCh = null; liveFam = null; }
+function killLive() { homeCache = {}; Object.keys(sig).forEach(k => delete sig[k]); avUrl = {}; if (liveCh) sb.removeChannel(liveCh); liveCh = null; liveFam = null; }
 async function loadMembers() {
   const { data: ms } = await sb.from("members").select("user_id, display_name, icon").eq("family_id", fam.id);
   members = Object.fromEntries((ms || []).map(m => [m.user_id, m]));
@@ -469,23 +481,28 @@ function startLive() {
   if (liveCh && liveFam === fam.id) return;
   killLive(); liveFam = fam.id;
   liveCh = sb.channel("live-" + fam.id);
-  ["messages", "photos", "photo_comments", "events", "members"].forEach(t =>
+  ["messages", "photos", "photo_comments", "events", "members", "message_reads"].forEach(t =>
     liveCh.on("postgres_changes", { event: "*", schema: "public", table: t, filter: "family_id=eq." + fam.id },
       async p => { if (t === "members") await loadMembers(); if (onLive) onLive(t, p); }));
   liveCh.on("postgres_changes", { event: "UPDATE", schema: "public", table: "families", filter: "id=eq." + fam.id },
     p => { fam.textOn = p.new.text_enabled !== false; fam.name = p.new.name; if (onLive) onLive("families", p); });
   liveCh.subscribe();
 }
+let homeCache = {};
 async function paintLast() {
   const { data } = await sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(1);
-  const m = data && data[0], el = $("#last");
-  if (el) el.innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body || (m.stamp ? "スタンプを送りました" : "写真を送りました"))}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
+  const m = data && data[0];
+  const h = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body || (m.stamp ? "スタンプを送りました" : "写真を送りました"))}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
+  homeCache.last = h; const el = $("#last"); if (el) el.innerHTML = h;
 }
 async function paintToday() {
   const t = new Date(), a = new Date(t.getFullYear(), t.getMonth(), t.getDate());
-  const { data } = await evq(a, addDays(a, 1)), el = $("#today");
-  if (el) el.innerHTML = (data && data.length) ? data.map(e => `<div><b>${hm(e.starts_at)}</b> ${esc(e.title)} <small>(${esc(who(e))})</small></div>`).join("") : "今日の予定はありません。";
+  const { data } = await evq(a, addDays(a, 1));
+  const h = (data && data.length) ? data.map(e => `<div><b>${hm(e.starts_at)}</b> ${esc(e.title)} <small>(${esc(who(e))})</small></div>`).join("") : "今日の予定はありません。";
+  homeCache.today = h; const el = $("#today"); if (el) el.innerHTML = h;
 }
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && me && fam && onLive) onLive("resume"); });
+window.addEventListener("online", () => { if (me && fam && onLive) onLive("resume"); });
 function ask(msg, ok = "はい") {
   return new Promise(res => {
     const o = document.createElement("div"); o.className = "ov"; o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true");
