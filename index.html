@@ -66,12 +66,12 @@ button.danger,.danger{background:#b5593a;color:#fff}
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="app"><p style="font-size:1.2rem">読み込み中…</p></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 const sb = supabase.createClient(
   "https://onzezcpkdfynssnhmzbl.supabase.co",
-  "sb_publishable_4PK7Wkl8JrFrOelSnMbAmw_2-M5IQk2");
+  "sb_publishable_4PK7Wkl8JrFrOelSnMbAmw_2-M5IQk2", { auth: { persistSession: true, autoRefreshToken: true } });
 const $app = document.getElementById("app");
 const FS = { "ふつう": 24, "大きい": 28, "とても大きい": 32 };
 let curFs = 24; try { curFs = +localStorage.getItem("fs") || 24; } catch (e) {}
@@ -113,6 +113,7 @@ function authView() {
     $("#go").disabled = false;
     if (r.error) return $("#err").textContent = jmsg(r.error);
     if (!r.data.session) return $("#err").textContent = "登録できませんでした。管理画面で「Confirm email」をオフにしてください。";
+    try { localStorage.setItem("em", email); } catch (e) {}
     start();
   };
   $("#go").onclick = go;
@@ -120,7 +121,12 @@ function authView() {
 }
 
 async function start() {
-  const { data: { user } } = await sb.auth.getUser();
+  let user = null;
+  { const { data: { session } } = await sb.auth.getSession(); user = session && session.user; }
+  if (!user) {
+    let em = null; try { em = localStorage.getItem("em"); } catch (e) {}
+    if (em) { const r = await sb.auth.signInWithPassword({ email: em, password: pwOf(em) }); user = r.data && r.data.user; }
+  }
   if (!user) return authView();
   me = user;
   const { data } = await sb.from("members").select("family_id, display_name, icon, role, families(name, text_enabled)").eq("user_id", me.id).limit(1);
@@ -163,7 +169,7 @@ function familyView() {
     let error; try { await ensure(); { const r = await sb.rpc("join_family", { code: cd, my_name: nm, my_icon: icon() }); error = r.error || (r.data ? null : { message: "招待コードが見つかりません" }); } } catch (e) { error = e; }
     error ? $("#err").textContent = jmsg(error) : start();
   };
-  $("#lo") && ($("#lo").onclick = async () => { killLive(); await sb.auth.signOut(); me = null; authView(); });
+  $("#lo") && ($("#lo").onclick = async () => { killLive(); try { localStorage.removeItem("em"); } catch (e) {} await sb.auth.signOut(); me = null; authView(); });
 }
 
 function homeView() {
@@ -193,7 +199,7 @@ function homeView() {
   onLive = t => { if (t === "members") homeView(); else if (t === "events") paintToday(); else if (t === "messages") paintLast(); };
   { const t = new Date(), a = new Date(t.getFullYear(), t.getMonth(), t.getDate());
     evq(a, addDays(a, 1)).then(({ data }) => { $("#today").innerHTML = (data && data.length) ? data.map(e => `<div><b>${hm(e.starts_at)}</b> ${esc(e.title)} <small>(${esc(who(e))})</small></div>`).join("") : "今日の予定はありません。"; }); }
-  $("#lo").onclick = async () => { killLive(); await sb.auth.signOut(); me = null; authView(); };
+  $("#lo").onclick = async () => { killLive(); try { localStorage.removeItem("em"); } catch (e) {} await sb.auth.signOut(); me = null; authView(); };
   $("#inv").onclick = async () => {
     const { data } = await sb.rpc("my_invite_code", { fid: fam.id });
     $("#invbox").innerHTML = `<div class="card" style="text-align:center">家族にこのコードを伝えてください<div class="code">${esc(data)}</div></div>`;
