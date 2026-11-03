@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>かぞくの窓(試作品)</title>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F8F4EC;--beige:#D9C9B5;--green:#91A88B;--text:#665747;--white:#fffdf8}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:500 20px/1.6 "Zen Maru Gothic","Hiragino Maru Gothic ProN","Meiryo",sans-serif}
+#app{max-width:720px;margin:0 auto;min-height:100%;padding:16px;display:flex;flex-direction:column;gap:16px}
+h1{font-size:30px;margin:8px 0}h2{font-size:24px;margin:0}
+input{width:100%;font:inherit;font-size:22px;padding:14px;border:3px solid var(--beige);border-radius:14px;background:var(--white);color:var(--text)}
+label{display:block;font-weight:700;margin:12px 0 4px}
+button{font:700 22px inherit;font-family:inherit;min-height:60px;padding:12px 20px;border:0;border-radius:16px;background:var(--green);color:#fff;cursor:pointer}
+button.sub{background:var(--beige);color:var(--text)}
+button:focus-visible,input:focus-visible{outline:4px solid var(--text);outline-offset:2px}
+.card{background:var(--white);border:3px solid var(--beige);border-radius:20px;padding:20px}
+.clock{text-align:center}.clock .t{font-size:72px;font-weight:700;line-height:1.1}.clock .d{font-size:26px}
+.big{display:grid;gap:12px}.big button{width:100%;font-size:26px;min-height:76px}
+.err{color:#a3401f;font-weight:700;min-height:1.6em}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between}
+#log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:4px;max-height:60vh}
+.m{max-width:85%;padding:10px 14px;border-radius:18px;background:var(--white);border:2px solid var(--beige)}
+.m.me{align-self:flex-end;background:var(--green);color:#fff;border-color:var(--green)}
+.m .who{font-size:16px;opacity:.85}.m .tm{font-size:14px;opacity:.75;text-align:right}
+.m .b{font-size:24px;white-space:pre-wrap;word-break:break-word}
+.send{display:flex;gap:8px}.send input{flex:1}
+.code{font-size:34px;letter-spacing:.2em;font-weight:700}
+.hide{display:none!important}
+@media (prefers-reduced-motion:no-preference){button{transition:transform .1s}button:active{transform:scale(.97)}}
+@media (max-width:420px){.clock .t{font-size:56px}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+const sb = supabase.createClient(
+  "https://onzezcpkdfynssnhmzbl.supabase.co",
+  "sb_publishable_4PK7Wkl8JrFrOelSnMbAmw_2-M5IQk2");
+const $app = document.getElementById("app");
+const ICONS = ["🌸","🌻","🍀","🐶","🐱","🐰","🍎","🌈","⭐","🐻"];
+let me, fam, members = {}, chan, tick;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const jmsg = e => (e && e.message || "うまくいきませんでした").replace(/Invalid login credentials/,"メールアドレスかパスワードが違います").replace(/User already registered/,"このメールアドレスは登録済みです").replace(/Password should be at least.*/,"パスワードは6文字以上にしてください");
+const set = h => { clearInterval(tick); if (chan) { sb.removeChannel(chan); chan = null; } $app.innerHTML = h; };
+const $ = s => $app.querySelector(s);
+
+function authView(mode = "login") {
+  const reg = mode === "register";
+  set(`<h1>🏠 かぞくの窓</h1><div class="card">
+    <h2>${reg ? "はじめての方" : "ログイン"}</h2>
+    <label>メールアドレス</label><input id="em" type="email" autocomplete="email">
+    <label>パスワード(6文字以上)</label><input id="pw" type="password" autocomplete="${reg ? "new-password" : "current-password"}">
+    <p class="err" id="err"></p>
+    <div class="big"><button id="go">${reg ? "登録する" : "ログイン"}</button>
+    <button class="sub" id="sw">${reg ? "ログインへ戻る" : "はじめての方はこちら"}</button></div></div>`);
+  $("#sw").onclick = () => authView(reg ? "login" : "register");
+  $("#go").onclick = async () => {
+    const email = $("#em").value.trim(), password = $("#pw").value;
+    const r = reg ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
+    if (r.error) return $("#err").textContent = jmsg(r.error);
+    if (!r.data.session) return $("#err").textContent = "確認メールを送りました。メールのリンクを開いてからログインしてください。";
+    start();
+  };
+}
+
+async function start() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return authView();
+  me = user;
+  const { data } = await sb.from("members").select("family_id, display_name, icon, families(name)").eq("user_id", me.id).limit(1);
+  if (!data || !data.length) return familyView();
+  fam = { id: data[0].family_id, name: data[0].families.name, my: data[0] };
+  const { data: ms } = await sb.from("members").select("user_id, display_name, icon").eq("family_id", fam.id);
+  members = Object.fromEntries((ms || []).map(m => [m.user_id, m]));
+  homeView();
+}
+
+function familyView() {
+  set(`<h1>家族グループ</h1><div class="card">
+    <label>あなたのお名前(家族に表示されます)</label><input id="nm" placeholder="例:おばあちゃん">
+    <label>家族の名前(作る場合)</label><input id="fn" placeholder="例:山田家">
+    <label>招待コード(参加する場合)</label><input id="cd" placeholder="6文字のコード" autocapitalize="characters">
+    <p class="err" id="err"></p>
+    <div class="big"><button id="mk">新しく作る</button><button class="sub" id="jn">コードで参加する</button>
+    <button class="sub" id="lo">ログアウト</button></div></div>`);
+  const icon = () => ICONS[Math.floor(Math.random() * ICONS.length)];
+  $("#mk").onclick = async () => {
+    const nm = $("#nm").value.trim(), fn = $("#fn").value.trim();
+    if (!nm || !fn) return $("#err").textContent = "お名前と家族の名前を入れてください";
+    const { error } = await sb.rpc("create_family", { fname: fn, my_name: nm, my_icon: icon() });
+    error ? $("#err").textContent = jmsg(error) : start();
+  };
+  $("#jn").onclick = async () => {
+    const nm = $("#nm").value.trim(), cd = $("#cd").value.trim();
+    if (!nm || !cd) return $("#err").textContent = "お名前と招待コードを入れてください";
+    const { error } = await sb.rpc("join_family", { code: cd, my_name: nm, my_icon: icon() });
+    error ? $("#err").textContent = jmsg(error) : start();
+  };
+  $("#lo").onclick = async () => { await sb.auth.signOut(); authView(); };
+}
+
+function homeView() {
+  set(`<div class="row"><h2>${esc(fam.my.icon)} ${esc(fam.my.display_name)}さん</h2><span>${esc(fam.name)}</span></div>
+    <div class="card clock"><div class="t" id="tm"></div><div class="d" id="dt"></div></div>
+    <div class="card"><h2>💬 いちばん新しいメッセージ</h2><div id="last">読み込み中…</div></div>
+    <div class="big"><button id="chat">💬 家族とおしゃべり</button>
+    <button class="sub" id="inv">👨‍👩‍👧 家族を招待する</button>
+    <button class="sub" id="lo">ログアウト</button></div><div id="invbox"></div>`);
+  const draw = () => {
+    const n = new Date();
+    $("#tm").textContent = n.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+    $("#dt").textContent = n.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
+  };
+  draw(); tick = setInterval(draw, 1000);
+  sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(1).then(({ data }) => {
+    const m = data && data[0];
+    $("#last").innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body)}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
+  });
+  $("#chat").onclick = chatView;
+  $("#lo").onclick = async () => { await sb.auth.signOut(); authView(); };
+  $("#inv").onclick = async () => {
+    const { data } = await sb.rpc("my_invite_code", { fid: fam.id });
+    $("#invbox").innerHTML = `<div class="card" style="text-align:center">家族にこのコードを伝えてください<div class="code">${esc(data)}</div></div>`;
+  };
+}
+
+async function chatView() {
+  set(`<div class="row"><button class="sub" id="bk">← もどる</button><h2>家族のチャット</h2></div>
+    <div class="card" style="padding:12px"><div id="log"></div></div>
+    <div class="send"><input id="tx" placeholder="メッセージを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
+  const log = $("#log");
+  const add = m => {
+    const mine = m.user_id === me.id, u = members[m.user_id] || { display_name: "家族", icon: "🙂" };
+    const t = new Date(m.created_at).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    log.insertAdjacentHTML("beforeend", `<div class="m ${mine ? "me" : ""}"><div class="who">${esc(u.icon)} ${esc(u.display_name)}</div><div class="b">${esc(m.body)}</div><div class="tm">${t}</div></div>`);
+    log.scrollTop = log.scrollHeight;
+  };
+  const { data } = await sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(50);
+  (data || []).reverse().forEach(add);
+  chan = sb.channel("chat-" + fam.id).on("postgres_changes",
+    { event: "INSERT", schema: "public", table: "messages", filter: "family_id=eq." + fam.id }, p => add(p.new)).subscribe();
+  const send = async () => {
+    const body = $("#tx").value.trim(); if (!body) return;
+    $("#tx").value = "";
+    const { error } = await sb.from("messages").insert({ family_id: fam.id, user_id: me.id, body });
+    if (error) { $("#err").textContent = "送れませんでした。もう一度お試しください。"; $("#tx").value = body; }
+  };
+  $("#sd").onclick = send;
+  $("#tx").onkeydown = e => { if (e.key === "Enter" && !e.isComposing) send(); };
+  $("#bk").onclick = start;
+}
+
+start();
+</script>
+</body>
+</html>
