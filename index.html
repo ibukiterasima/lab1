@@ -53,6 +53,8 @@ small{font-size:.85em}
 button.danger,.danger{background:#b5593a;color:#fff}
 .ov{position:fixed;inset:0;z-index:10;background:rgba(102,87,71,.6);display:flex;align-items:center;justify-content:center;padding:16px}
 .ov .card{max-width:560px;width:100%}
+.cimg{max-width:100%;max-height:50vh;border-radius:12px;display:block;margin-top:6px;cursor:pointer}
+.ov{overflow-y:auto}.ov img{max-width:100%;max-height:55vh;display:block;margin:0 auto 12px;border-radius:12px}
 </style>
 </head>
 <body>
@@ -70,7 +72,7 @@ const SVG = {"home": "<path d=\"M3 11l9-8 9 8M5 10v10h14V10M10 20v-6h4v6\"/>", "
 Object.assign(SVG, {
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
-  plus: '<path d="M12 5v14M5 12h14"/>', forward: '<path d="M9 5l7 7-7 7"/>' });
+  plus: '<path d="M12 5v14M5 12h14"/>', download: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>', forward: '<path d="M9 5l7 7-7 7"/>' });
 let avUrl = {};
 const ic = n => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${SVG[n] || SVG.smile}</svg>`;
 const av = n => {
@@ -174,7 +176,7 @@ function homeView() {
   draw(); tick = setInterval(draw, 1000);
   sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(1).then(({ data }) => {
     const m = data && data[0];
-    $("#last").innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body)}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
+    $("#last").innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body || "写真を送りました")}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
   });
   $("#chat").onclick = chatView;
   $("#ph").onclick = photoView;
@@ -192,12 +194,13 @@ function homeView() {
 async function chatView() {
   set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>家族のチャット</h2></div>
     <div class="card" style="padding:12px"><div id="log"></div></div>
-    <div class="send"><input id="tx" placeholder="メッセージを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
+    <div class="send"><input id="ci" type="file" accept="image/*" class="hide"><button class="sub" id="cb" aria-label="写真を送る">${ic("camera")}</button><input id="tx" placeholder="メッセージを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
   const log = $("#log");
   const add = m => {
     const mine = m.user_id === me.id, u = members[m.user_id] || { display_name: "家族", icon: "smile" };
     const t = new Date(m.created_at).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
-    log.insertAdjacentHTML("beforeend", `<div class="m ${mine ? "me" : ""}"><div class="who">${av(u.icon)} ${esc(u.display_name)}</div><div class="b">${esc(m.body)}</div><div class="tm">${t}</div></div>`);
+    log.insertAdjacentHTML("beforeend", `<div class="m ${mine ? "me" : ""}"><div class="who">${av(u.icon)} ${esc(u.display_name)}</div><div class="b">${m.body ? esc(m.body) : ""}${m.photo_path ? `<img class="cimg" data-p="${esc(m.photo_path)}" alt="送られた写真(押すと大きく見られます)">` : ""}</div><div class="tm">${t}</div></div>`);
+    if (m.photo_path) { const im = log.lastElementChild.querySelector(".cimg"); signed(m.photo_path).then(u => { im.src = u; log.scrollTop = log.scrollHeight; }); }
     log.scrollTop = log.scrollHeight;
   };
   const { data } = await sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(50);
@@ -211,6 +214,19 @@ async function chatView() {
     if (error) { $("#err").textContent = "送れませんでした。もう一度お試しください。"; $("#tx").value = body; }
   };
   $("#sd").onclick = send;
+  log.onclick = e => { const im = e.target.closest(".cimg"); if (im && im.src) viewImage(im.dataset.p, im.src); };
+  $("#cb").onclick = () => $("#ci").click();
+  $("#ci").onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    $("#err").textContent = "写真を送っています…";
+    try {
+      const blob = await shrink(f), path = `${fam.id}/chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+      const u = await sb.storage.from("photos").upload(path, blob, { contentType: "image/jpeg" }); if (u.error) throw u.error;
+      const r = await sb.from("messages").insert({ family_id: fam.id, user_id: me.id, photo_path: path }); if (r.error) throw r.error;
+      $("#err").textContent = "";
+    } catch (x) { $("#err").textContent = "写真を送れませんでした。"; }
+    e.target.value = "";
+  };
   $("#tx").onkeydown = e => { if (e.key === "Enter" && !e.isComposing) send(); };
   $("#bk").onclick = start;
 }
@@ -259,9 +275,11 @@ async function photoDetail(p, url) {
   set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button>${p.user_id === me.id ? '<button class="sub" id="rm">' + ic("trash") + ' けす</button>' : ""}</div>
     <img class="photo" src="${esc(url)}" alt="家族の写真">
     <div>${av(u.icon)} <b>${esc(u.display_name)}</b>さん ・ ${fmt(p.created_at)}</div>
+    <button class="sub" id="dl">${ic("download")} スマホに保存</button>
     <div class="card"><h2>${ic("chat")} コメント</h2><div id="cm">読み込み中…</div></div>
     <div class="send"><input id="tx" placeholder="コメントを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
   $("#bk").onclick = photoView;
+  $("#dl").onclick = () => saveToPhone(url);
   onLive = (t, pl) => { if (t === "photo_comments" || t === "members") draw(); else if (t === "photos" && pl.eventType === "DELETE" && pl.old.id === p.id) photoView(); };
   if ($("#rm")) $("#rm").onclick = async () => {
     if (!await ask("この写真をけしますか?", "けす")) return;
@@ -414,7 +432,7 @@ function startLive() {
 async function paintLast() {
   const { data } = await sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(1);
   const m = data && data[0], el = $("#last");
-  if (el) el.innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body)}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
+  if (el) el.innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body || "写真を送りました")}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
 }
 async function paintToday() {
   const t = new Date(), a = new Date(t.getFullYear(), t.getMonth(), t.getDate());
@@ -430,6 +448,35 @@ function ask(msg, ok = "はい") {
     o.querySelector("#yes").onclick = () => done(true); o.querySelector("#no").onclick = () => done(false);
     o.querySelector("#no").focus();
   });
+}
+
+const sig = {};
+const signed = p => sig[p] || (sig[p] = sb.storage.from("photos").createSignedUrl(p, 3600).then(r => r.data ? r.data.signedUrl : ""));
+async function saveToPhone(url, name = "photo.jpg") {
+  try {
+    const blob = await (await fetch(url)).blob(), file = new File([blob], name, { type: blob.type || "image/jpeg" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === "AbortError") return; }
+    }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) { alert("保存できませんでした。写真を長く押して保存してください。"); }
+}
+function viewImage(path, url) {
+  const o = document.createElement("div"); o.className = "ov"; o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true");
+  o.innerHTML = `<div class="card"><img src="${esc(url)}" alt="送られた写真"><p class="err" id="vm" role="status"></p>
+    <div class="big"><button id="al">${ic("plus")} アルバムに保存</button><button class="sub" id="ph2">${ic("download")} スマホに保存</button><button class="sub" id="cl2">とじる</button></div></div>`;
+  document.body.appendChild(o);
+  const q = x => o.querySelector(x);
+  q("#cl2").onclick = () => o.remove(); q("#cl2").focus();
+  q("#ph2").onclick = () => saveToPhone(url);
+  q("#al").onclick = async () => {
+    q("#al").disabled = true; q("#vm").textContent = "保存しています…";
+    const np = `${fam.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+    const c = await sb.storage.from("photos").copy(path, np);
+    const r = c.error ? c : await sb.from("photos").insert({ family_id: fam.id, user_id: me.id, path: np });
+    q("#vm").textContent = r.error ? "保存できませんでした。" : "アルバムに保存しました。";
+    q("#al").disabled = false;
+  };
 }
 
 start();
