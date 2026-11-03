@@ -12,11 +12,11 @@ html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--text);font:500 20px/1.6 "Zen Maru Gothic","Hiragino Maru Gothic ProN","Meiryo",sans-serif}
 #app{max-width:720px;margin:0 auto;min-height:100%;padding:16px;display:flex;flex-direction:column;gap:16px}
 h1{font-size:30px;margin:8px 0}h2{font-size:24px;margin:0}
-input{width:100%;font:inherit;font-size:22px;padding:14px;border:3px solid var(--beige);border-radius:14px;background:var(--white);color:var(--text)}
+input,select{width:100%;font:inherit;font-size:22px;padding:14px;border:3px solid var(--beige);border-radius:14px;background:var(--white);color:var(--text)}
 label{display:block;font-weight:700;margin:12px 0 4px}
 button{font:700 22px inherit;font-family:inherit;min-height:60px;padding:12px 20px;border:0;border-radius:16px;background:var(--green);color:#fff;cursor:pointer}
 button.sub{background:var(--beige);color:var(--text)}
-button:focus-visible,input:focus-visible{outline:4px solid var(--text);outline-offset:2px}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid var(--text);outline-offset:2px}
 .card{background:var(--white);border:3px solid var(--beige);border-radius:20px;padding:20px}
 .clock{text-align:center}.clock .t{font-size:72px;font-weight:700;line-height:1.1}.clock .d{font-size:26px}
 .big{display:grid;gap:12px}.big button{width:100%;font-size:26px;min-height:76px}
@@ -37,6 +37,16 @@ button:focus-visible,input:focus-visible{outline:4px solid var(--text);outline-o
 .grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;border:3px solid var(--beige);display:block}
 .photo{width:100%;border-radius:16px;border:3px solid var(--beige);display:block}
 svg.ic{width:1.1em;height:1.1em;vertical-align:-.2em;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin-right:.2em}
+.av{width:1.4em;height:1.4em;border-radius:50%;object-fit:cover;vertical-align:-.3em;margin-right:.2em;border:2px solid var(--beige)}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal button{min-height:56px;padding:4px;font-size:20px;background:var(--white);color:var(--text);border:2px solid var(--beige);border-radius:10px}
+.cal .today{border:4px solid var(--green)}.cal .sel{background:var(--green);color:#fff}
+.cal .dot{display:block;height:8px;width:8px;border-radius:50%;background:var(--green);margin:2px auto 0}.cal .sel .dot{background:#fff}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs button{flex:1;min-height:52px;font-size:20px}
+.ev{width:100%;text-align:left;margin-top:8px;font-size:22px;font-weight:500}
+.icg{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px}
+.icg button{min-height:72px;font-size:40px;background:var(--white);color:var(--text);border:3px solid var(--beige);padding:0}
+.icg .on{border-color:var(--green);background:#e8efe6}
 </style>
 </head>
 <body>
@@ -48,8 +58,16 @@ const sb = supabase.createClient(
   "sb_publishable_4PK7Wkl8JrFrOelSnMbAmw_2-M5IQk2");
 const $app = document.getElementById("app");
 const SVG = {"home": "<path d=\"M3 11l9-8 9 8M5 10v10h14V10M10 20v-6h4v6\"/>", "chat": "<path d=\"M4 5h16v11H9l-5 4z\"/>", "camera": "<path d=\"M3 8h4l2-3h6l2 3h4v12H3z\"/><circle cx=\"12\" cy=\"13\" r=\"4\"/>", "users": "<circle cx=\"9\" cy=\"8\" r=\"3\"/><path d=\"M3 20c0-3.5 3-6 6-6s6 2.5 6 6\"/><circle cx=\"17\" cy=\"9\" r=\"2.5\"/><path d=\"M16 14c3 0 5 2 5 5\"/>", "trash": "<path d=\"M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13\"/>", "back": "<path d=\"M15 5l-7 7 7 7\"/>", "star": "<path d=\"M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z\"/>", "heart": "<path d=\"M12 20s-8-5-8-11a4.5 4.5 0 018-2.5A4.5 4.5 0 0120 9c0 6-8 11-8 11z\"/>", "sun": "<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2\"/>", "leaf": "<path d=\"M5 19C5 10 10 5 20 4c0 10-5 15-14 15zM5 19l8-8\"/>", "flower": "<circle cx=\"12\" cy=\"12\" r=\"2.5\"/><circle cx=\"12\" cy=\"6.5\" r=\"3\"/><circle cx=\"12\" cy=\"17.5\" r=\"3\"/><circle cx=\"6.5\" cy=\"12\" r=\"3\"/><circle cx=\"17.5\" cy=\"12\" r=\"3\"/>", "moon": "<path d=\"M20 14A8 8 0 1110 4a6.5 6.5 0 0010 10z\"/>", "cloud": "<path d=\"M7 18a4 4 0 010-8 5.5 5.5 0 0110.5 1.5A3.3 3.3 0 0117 18z\"/>", "apple": "<path d=\"M12 8c-3-2-7 0-7 5s3 8 7 7c4 1 7-2 7-7s-4-7-7-5zM12 8c0-2 1-4 3-4\"/>", "smile": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 14c1 2 3 3 4 3s3-1 4-3M9 10h.01M15 10h.01\"/>"};
+Object.assign(SVG, {
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  sliders: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>', forward: '<path d="M9 5l7 7-7 7"/>' });
+let avUrl = {};
 const ic = n => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${SVG[n] || SVG.smile}</svg>`;
-const av = n => ic(SVG[n] ? n : "smile");
+const av = n => {
+  if (n && n.startsWith("photo:")) { const u = avUrl[n.slice(6)]; return u ? `<img class="av" src="${esc(u)}" alt="">` : ic("smile"); }
+  return ic(SVG[n] ? n : "smile");
+};
 const ICONS = ["flower","leaf","star","heart","sun","moon","cloud","apple","smile"];
 let me, fam, members = {}, chan, tick;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -90,6 +108,10 @@ async function start() {
   fam = { id: data[0].family_id, name: data[0].families.name, my: data[0] };
   const { data: ms } = await sb.from("members").select("user_id, display_name, icon").eq("family_id", fam.id);
   members = Object.fromEntries((ms || []).map(m => [m.user_id, m]));
+  fam.my = members[me.id] || fam.my;
+  const ph = [...new Set(Object.values(members).map(m => m.icon).filter(i => i && i.startsWith("photo:")).map(i => i.slice(6)))];
+  avUrl = {};
+  if (ph.length) { const { data: u } = await sb.storage.from("photos").createSignedUrls(ph, 3600); (u || []).forEach(x => avUrl[x.path] = x.signedUrl); }
   homeView();
 }
 
@@ -126,9 +148,12 @@ function familyView() {
 function homeView() {
   set(`<div class="row"><h2>${av(fam.my.icon)} ${esc(fam.my.display_name)}さん</h2><span>${esc(fam.name)}</span></div>
     <div class="card clock"><div class="t" id="tm"></div><div class="d" id="dt"></div></div>
+    <div class="card"><h2>${ic("calendar")} 今日の予定</h2><div id="today">読み込み中…</div></div>
     <div class="card"><h2>${ic("chat")} いちばん新しいメッセージ</h2><div id="last">読み込み中…</div></div>
     <div class="big"><button id="chat">${ic("chat")} 家族とおしゃべり</button>
     <button id="ph">${ic("camera")} 家族の写真</button>
+    <button id="cl">${ic("calendar")} 家族の予定</button>
+    <button class="sub" id="st">${ic("sliders")} 設定</button>
     <button class="sub" id="inv">${ic("users")} 家族を招待する</button>
     <button class="sub" id="lo">ログアウト</button></div><div id="invbox"></div>`);
   const draw = () => {
@@ -143,6 +168,9 @@ function homeView() {
   });
   $("#chat").onclick = chatView;
   $("#ph").onclick = photoView;
+  $("#cl").onclick = () => calView(); $("#st").onclick = settingsView;
+  { const t = new Date(), a = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    evq(a, addDays(a, 1)).then(({ data }) => { $("#today").innerHTML = (data && data.length) ? data.map(e => `<div><b>${hm(e.starts_at)}</b> ${esc(e.title)} <small>(${esc(who(e))})</small></div>`).join("") : "今日の予定はありません。"; }); }
   $("#lo").onclick = async () => { await sb.auth.signOut(); me = null; authView(); };
   $("#inv").onclick = async () => {
     const { data } = await sb.rpc("my_invite_code", { fid: fam.id });
@@ -242,6 +270,107 @@ async function photoDetail(p, url) {
   };
   $("#sd").onclick = send;
   $("#tx").onkeydown = e => { if (e.key === "Enter" && !e.isComposing) send(); };
+}
+
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const hm = t => new Date(t).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+const evq = (a, b) => sb.from("events").select("*").eq("family_id", fam.id).gte("starts_at", a.toISOString()).lt("starts_at", b.toISOString()).order("starts_at");
+const who = e => e.for_member ? ((members[e.for_member] || {}).display_name || "家族") : "みんな";
+
+async function calView(cur = new Date(), rng = null) {
+  const y = cur.getFullYear(), m = cur.getMonth(), now = new Date(), t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  rng = rng || { a: t0, b: addDays(t0, 1), label: "今日" };
+  const first = new Date(y, m, 1), days = new Date(y, m + 1, 0).getDate();
+  set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>家族の予定</h2></div>
+    <div class="row"><button class="sub" id="pv" aria-label="前の月">${ic("back")}</button><h2>${y}年${m + 1}月</h2><button class="sub" id="nx" aria-label="次の月">${ic("forward")}</button></div>
+    <div class="cal" id="cal"></div>
+    <div class="tabs"><button class="sub" data-r="0">今日</button><button class="sub" data-r="1">明日</button><button class="sub" data-r="7">今週</button></div>
+    <div class="card"><h2>${esc(rng.label)}の予定</h2><div id="ls">読み込み中…</div></div>
+    <button id="ad">${ic("plus")} 予定を入れる</button>`);
+  $("#bk").onclick = start;
+  $("#pv").onclick = () => calView(new Date(y, m - 1, 1));
+  $("#nx").onclick = () => calView(new Date(y, m + 1, 1));
+  $("#ad").onclick = () => eventForm(null, ymd(rng.a));
+  $app.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+    const n = +b.dataset.r, a = addDays(t0, n === 1 ? 1 : 0);
+    calView(cur, { a, b: addDays(t0, n === 7 ? 7 : n + 1), label: ["今日", "明日", "今週"][n === 0 ? 0 : n === 1 ? 1 : 2] });
+  });
+  const cnt = {};
+  const mq = await evq(first, new Date(y, m + 1, 1));
+  (mq.data || []).forEach(e => { const k = ymd(new Date(e.starts_at)); cnt[k] = (cnt[k] || 0) + 1; });
+  let h = ["日", "月", "火", "水", "木", "金", "土"].map(w => `<div><b>${w}</b></div>`).join("") + "<div></div>".repeat(first.getDay());
+  for (let d = 1; d <= days; d++) {
+    const dt = new Date(y, m, d), k = ymd(dt);
+    h += `<button data-d="${k}" class="${k === ymd(t0) ? "today" : ""} ${k === ymd(rng.a) && rng.b - rng.a === 864e5 ? "sel" : ""}">${d}<span class="dot" style="visibility:${cnt[k] ? "visible" : "hidden"}"></span></button>`;
+  }
+  $("#cal").innerHTML = h;
+  $("#cal").onclick = e => { const b = e.target.closest("button"); if (!b) return; const [yy, mm, dd] = b.dataset.d.split("-").map(Number);
+    const a = new Date(yy, mm - 1, dd); calView(cur, { a, b: addDays(a, 1), label: `${mm}月${dd}日` }); };
+  const { data } = await evq(rng.a, rng.b);
+  const ls = $("#ls");
+  ls.innerHTML = (data && data.length) ? data.map((e, i) => { const d = new Date(e.starts_at);
+    return `<button class="ev sub" data-i="${i}"><b>${d.getMonth() + 1}/${d.getDate()} ${hm(e.starts_at)}</b> ${esc(e.title)}<br><small>${esc(who(e))}</small></button>`; }).join("") : "予定はありません。";
+  ls.onclick = e => { const b = e.target.closest("button"); if (b) eventForm(data[b.dataset.i]); };
+}
+
+function eventForm(ev, ds) {
+  const d = ev ? new Date(ev.starts_at) : null;
+  const date = d ? ymd(d) : ds, time = d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "10:00";
+  const opts = `<option value="">みんな</option>` + Object.values(members).map(u => `<option value="${esc(u.user_id)}">${esc(u.display_name)}</option>`).join("");
+  set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>${ev ? "予定をなおす" : "予定を入れる"}</h2></div>
+    <div class="card"><label>予定の内容</label><input id="ti" placeholder="例:病院、誕生日会">
+    <label>日にち</label><input id="dt" type="date"><label>時間</label><input id="hv" type="time">
+    <label>だれの予定</label><select id="wh">${opts}</select><p class="err" id="err"></p></div>
+    <div class="big"><button id="sv">保存する</button>${ev ? `<button class="sub" id="rm">${ic("trash")} 予定をけす</button>` : ""}</div>`);
+  $("#ti").value = ev ? ev.title : ""; $("#dt").value = date; $("#hv").value = time; $("#wh").value = ev && ev.for_member || "";
+  $("#bk").onclick = () => calView(d || new Date(date + "T00:00"));
+  $("#sv").onclick = async () => {
+    const title = $("#ti").value.trim(), dv = $("#dt").value, tv = $("#hv").value;
+    if (!title || !dv || !tv) return $("#err").textContent = "内容・日にち・時間を入れてください";
+    const at = new Date(`${dv}T${tv}`);
+    const row = { title, starts_at: at.toISOString(), for_member: $("#wh").value || null };
+    const r = ev ? await sb.from("events").update(row).eq("id", ev.id) : await sb.from("events").insert({ ...row, family_id: fam.id, created_by: me.id });
+    r.error ? $("#err").textContent = "保存できませんでした。もう一度お試しください。" : calView(at);
+  };
+  if (ev) $("#rm").onclick = async () => { if (confirm("この予定をけしますか?")) { await sb.from("events").delete().eq("id", ev.id); calView(d); } };
+}
+
+function settingsView() {
+  let icon = fam.my.icon;
+  set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>設定</h2></div>
+    <div class="card"><label>お名前</label><input id="nm" autocomplete="off">
+    <label>アイコン</label><div id="cur" style="font-size:64px"></div><div class="icg" id="ics"></div>
+    <input id="fi" type="file" accept="image/*" class="hide">
+    <div class="big" style="margin-top:12px"><button class="sub" id="up">${ic("camera")} 写真をえらぶ</button></div></div>
+    <p class="err" id="err"></p><div class="big"><button id="sv">保存する</button></div>`);
+  $("#nm").value = fam.my.display_name;
+  const draw = () => {
+    $("#cur").innerHTML = av(icon);
+    $("#ics").innerHTML = ICONS.map(k => `<button data-k="${k}" class="${k === icon ? "on" : ""}" aria-label="アイコンをえらぶ">${ic(k)}</button>`).join("");
+  };
+  draw();
+  $("#ics").onclick = e => { const b = e.target.closest("button"); if (b) { icon = b.dataset.k; draw(); } };
+  $("#bk").onclick = start;
+  $("#up").onclick = () => $("#fi").click();
+  $("#fi").onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const blob = await shrink(f, 256), path = `${fam.id}/avatar-${me.id}-${Date.now()}.jpg`;
+      const u = await sb.storage.from("photos").upload(path, blob, { contentType: "image/jpeg" });
+      if (u.error) throw u.error;
+      avUrl[path] = URL.createObjectURL(blob); icon = "photo:" + path; $("#err").textContent = ""; draw();
+    } catch (x) { $("#err").textContent = "写真をのせられませんでした。"; }
+  };
+  $("#sv").onclick = async () => {
+    const name = $("#nm").value.trim();
+    if (!name) return $("#err").textContent = "お名前を入れてください";
+    const { error } = await sb.from("members").update({ display_name: name, icon }).eq("family_id", fam.id).eq("user_id", me.id);
+    if (error) return $("#err").textContent = "保存できませんでした。もう一度お試しください。";
+    const old = fam.my.icon;
+    if (old && old.startsWith("photo:") && old !== icon) sb.storage.from("photos").remove([old.slice(6)]);
+    start();
+  };
 }
 
 start();
