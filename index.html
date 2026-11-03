@@ -31,7 +31,8 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 .send{display:flex;gap:8px}.send input{flex:1}
 .code{font-size:1.7rem;letter-spacing:.2em;font-weight:700}
 .hide{display:none!important}
-@media (prefers-reduced-motion:no-preference){button{transition:transform .1s}button:active{transform:scale(.97)}}
+button,select,input{touch-action:manipulation}
+button:active{filter:brightness(.88)}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .grid button{padding:0;min-height:0;background:none;border-radius:14px}
@@ -55,6 +56,11 @@ button.danger,.danger{background:#b5593a;color:#fff}
 .ov .card{max-width:560px;width:100%}
 .cimg{max-width:100%;max-height:50vh;border-radius:12px;display:block;margin-top:6px;cursor:pointer}
 .ov{overflow-y:auto}.ov img{max-width:100%;max-height:55vh;display:block;margin:0 auto 12px;border-radius:12px}
+.send .lb{display:none}.send.notext .lb{display:inline;margin-left:.2em}.send.notext button{flex:1}
+.stg{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stg button{padding:0;min-height:0;background:none;border-radius:24px}
+.stg img,.stamp{width:100%;aspect-ratio:1;object-fit:cover;border-radius:24px;display:block}
+.stamp{width:7rem}.m.pending{opacity:.6}
 </style>
 </head>
 <body>
@@ -83,6 +89,7 @@ const ICONS = ["flower","leaf","star","heart","sun","moon","cloud","apple","smil
 let me, fam, members = {}, chan, tick;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const jmsg = e => (e && e.message || "うまくいきませんでした").replace(/Invalid login credentials/,"メールアドレスかパスワードが違います").replace(/User already registered/,"このメールアドレスは登録済みです").replace(/Password should be at least.*/,"パスワードは6文字以上にしてください");
+const goHome = () => (fam ? homeView() : start());
 const set = h => { onLive = null; clearInterval(tick); if (chan) { sb.removeChannel(chan); chan = null; } $app.innerHTML = h; };
 const $ = s => $app.querySelector(s);
 
@@ -114,9 +121,9 @@ async function start() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return authView();
   me = user;
-  const { data } = await sb.from("members").select("family_id, display_name, icon, families(name)").eq("user_id", me.id).limit(1);
+  const { data } = await sb.from("members").select("family_id, display_name, icon, role, families(name, text_enabled)").eq("user_id", me.id).limit(1);
   if (!data || !data.length) return familyView();
-  fam = { id: data[0].family_id, name: data[0].families.name, my: data[0] };
+  fam = { id: data[0].family_id, name: data[0].families.name, my: data[0], textOn: data[0].families.text_enabled !== false, admin: data[0].role === "admin" };
   const { data: ms } = await sb.from("members").select("user_id, display_name, icon").eq("family_id", fam.id);
   members = Object.fromEntries((ms || []).map(m => [m.user_id, m]));
   fam.my = members[me.id] || fam.my;
@@ -176,7 +183,7 @@ function homeView() {
   draw(); tick = setInterval(draw, 1000);
   sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(1).then(({ data }) => {
     const m = data && data[0];
-    $("#last").innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body || "写真を送りました")}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
+    $("#last").innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body || (m.stamp ? "スタンプを送りました" : "写真を送りました"))}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
   });
   $("#chat").onclick = chatView;
   $("#ph").onclick = photoView;
@@ -194,12 +201,19 @@ function homeView() {
 async function chatView() {
   set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>家族のチャット</h2></div>
     <div class="card" style="padding:12px"><div id="log"></div></div>
-    <div class="send"><input id="ci" type="file" accept="image/*" class="hide"><button class="sub" id="cb" aria-label="写真を送る">${ic("camera")}</button><input id="tx" placeholder="メッセージを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
-  const log = $("#log");
+    <p class="hide" id="hint">いまは、写真とスタンプだけ送れます。</p><div class="card hide" id="tray"><div class="stg" id="stg"></div></div>
+    <div class="send" id="bar"><input id="ci" type="file" accept="image/*" class="hide"><button class="sub" id="cb" aria-label="写真を送る">${ic("camera")}<span class="lb">写真</span></button><button class="sub" id="sk" aria-label="スタンプを送る">${ic("smile")}<span class="lb">スタンプ</span></button><input id="tx" placeholder="メッセージを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
+  const log = $("#log"), seen = new Set();
+  const paintComposer = () => { $("#tx").classList.toggle("hide", !fam.textOn); $("#sd").classList.toggle("hide", !fam.textOn);
+    $("#bar").classList.toggle("notext", !fam.textOn); $("#hint").classList.toggle("hide", fam.textOn); };
+  paintComposer();
+  onLive = t => { if (t === "families") paintComposer(); };
+  $("#stg").innerHTML = Array.from({ length: 13 }, (_, i) => `<button data-n="${i + 1}" aria-label="スタンプ${i + 1}"><img src="${i + 1}.png" alt="スタンプ${i + 1}"></button>`).join("");
   const add = m => {
+    if (seen.has(m.id)) return; seen.add(m.id);
     const mine = m.user_id === me.id, u = members[m.user_id] || { display_name: "家族", icon: "smile" };
     const t = new Date(m.created_at).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
-    log.insertAdjacentHTML("beforeend", `<div class="m ${mine ? "me" : ""}"><div class="who">${av(u.icon)} ${esc(u.display_name)}</div><div class="b">${m.body ? esc(m.body) : ""}${m.photo_path ? `<img class="cimg" data-p="${esc(m.photo_path)}" alt="送られた写真(押すと大きく見られます)">` : ""}</div><div class="tm">${t}</div></div>`);
+    log.insertAdjacentHTML("beforeend", `<div class="m ${mine ? "me" : ""}"><div class="who">${av(u.icon)} ${esc(u.display_name)}</div><div class="b">${m.body ? esc(m.body) : ""}${m.stamp ? `<img class="stamp" src="${m.stamp}.png" alt="スタンプ">` : ""}${m.photo_path ? `<img class="cimg" data-p="${esc(m.photo_path)}" alt="送られた写真(押すと大きく見られます)">` : ""}</div><div class="tm">${t}</div></div>`);
     if (m.photo_path) { const im = log.lastElementChild.querySelector(".cimg"); signed(m.photo_path).then(u => { im.src = u; log.scrollTop = log.scrollHeight; }); }
     log.scrollTop = log.scrollHeight;
   };
@@ -207,12 +221,21 @@ async function chatView() {
   (data || []).reverse().forEach(add);
   chan = sb.channel("chat-" + fam.id).on("postgres_changes",
     { event: "INSERT", schema: "public", table: "messages", filter: "family_id=eq." + fam.id }, p => add(p.new)).subscribe();
-  const send = async () => {
-    const body = $("#tx").value.trim(); if (!body) return;
-    $("#tx").value = "";
-    const { error } = await sb.from("messages").insert({ family_id: fam.id, user_id: me.id, body });
-    if (error) { $("#err").textContent = "送れませんでした。もう一度お試しください。"; $("#tx").value = body; }
+  const post = async (fields, html, restore) => {
+    log.insertAdjacentHTML("beforeend", `<div class="m me pending"><div class="b">${html}</div><div class="tm">送っています…</div></div>`);
+    const pend = log.lastElementChild; log.scrollTop = log.scrollHeight;
+    const { data, error } = await sb.from("messages").insert({ family_id: fam.id, user_id: me.id, ...fields }).select().single();
+    pend.remove();
+    if (error) { $("#err").textContent = "送れませんでした。もう一度お試しください。"; if (restore) restore(); return; }
+    add(data);
   };
+  const send = () => {
+    const body = $("#tx").value.trim(); if (!body || !fam.textOn) return;
+    $("#tx").value = ""; post({ body }, esc(body), () => { $("#tx").value = body; });
+  };
+  $("#sk").onclick = () => $("#tray").classList.toggle("hide");
+  $("#stg").onclick = e => { const b = e.target.closest("button"); if (!b) return; const n = +b.dataset.n;
+    $("#tray").classList.add("hide"); post({ stamp: n }, `<img class="stamp" src="${n}.png" alt="">`); };
   $("#sd").onclick = send;
   log.onclick = e => { const im = e.target.closest(".cimg"); if (im && im.src) viewImage(im.dataset.p, im.src); };
   $("#cb").onclick = () => $("#ci").click();
@@ -228,7 +251,7 @@ async function chatView() {
     e.target.value = "";
   };
   $("#tx").onkeydown = e => { if (e.key === "Enter" && !e.isComposing) send(); };
-  $("#bk").onclick = start;
+  $("#bk").onclick = goHome;
 }
 
 const fmt = t => new Date(t).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -244,7 +267,7 @@ async function photoView() {
   set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>家族の写真</h2></div>
     <input id="fi" type="file" accept="image/*" multiple class="hide">
     <button id="up">${ic("camera")} 写真をのせる</button><p class="err" id="err"></p><div class="grid" id="gr">読み込み中…</div>`);
-  $("#bk").onclick = start;
+  $("#bk").onclick = goHome;
   $("#up").onclick = () => $("#fi").click();
   $("#fi").onchange = async e => {
     const files = [...e.target.files]; let i = 0;
@@ -319,7 +342,7 @@ async function calView(cur = new Date(), rng = null) {
     <div class="tabs"><button class="sub" data-r="0">今日</button><button class="sub" data-r="1">明日</button><button class="sub" data-r="7">今週</button></div>
     <div class="card"><h2>${esc(rng.label)}の予定</h2><div id="ls">読み込み中…</div></div>
     <button id="ad">${ic("plus")} 予定を入れる</button>`);
-  $("#bk").onclick = start;
+  $("#bk").onclick = goHome;
   onLive = t => { if (t === "events" || t === "members") calView(cur, rng); };
   $("#pv").onclick = () => calView(new Date(y, m - 1, 1));
   $("#nx").onclick = () => calView(new Date(y, m + 1, 1));
@@ -378,6 +401,14 @@ function settingsView() {
     <p class="err" id="err"></p><div class="big"><button id="sv">保存する</button></div>`);
   $("#nm").value = fam.my.display_name;
   $("#sv").parentElement.insertAdjacentHTML("beforebegin", `<div class="card"><label>文字の大きさ</label><div class="tabs" id="fs"></div></div>`);
+  if (fam.admin) {
+    $("#sv").parentElement.insertAdjacentHTML("beforebegin", `<div class="card"><label>チャットで送れるもの(管理者のみ)</label><div class="tabs" id="tx2"></div><p class="err" id="tm2"></p></div>`);
+    const td = () => { $("#tx2").innerHTML = [[true, "文字・写真・スタンプ"], [false, "写真とスタンプだけ"]].map(([v, l]) => `<button data-v="${v}" class="sub ${fam.textOn === v ? "on" : ""}">${l}</button>`).join(""); };
+    td();
+    $("#tx2").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const v = b.dataset.v === "true", old = fam.textOn; fam.textOn = v; td();
+      const { error } = await sb.from("families").update({ text_enabled: v }).eq("id", fam.id);
+      if (error) { fam.textOn = old; td(); $("#tm2").textContent = "変更できませんでした。"; } };
+  }
   const fd = () => { $("#fs").innerHTML = Object.keys(FS).map(k => `<button data-k="${k}" class="sub ${FS[k] === curFs ? "on" : ""}">${k}</button>`).join(""); };
   fd();
   $("#fs").onclick = e => { const b = e.target.closest("button"); if (!b) return; curFs = FS[b.dataset.k];
@@ -388,7 +419,7 @@ function settingsView() {
   };
   draw();
   $("#ics").onclick = e => { const b = e.target.closest("button"); if (b) { icon = b.dataset.k; draw(); } };
-  $("#bk").onclick = start;
+  $("#bk").onclick = goHome;
   $("#up").onclick = () => $("#fi").click();
   $("#fi").onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
@@ -427,12 +458,14 @@ function startLive() {
   ["messages", "photos", "photo_comments", "events", "members"].forEach(t =>
     liveCh.on("postgres_changes", { event: "*", schema: "public", table: t, filter: "family_id=eq." + fam.id },
       async p => { if (t === "members") await loadMembers(); if (onLive) onLive(t, p); }));
+  liveCh.on("postgres_changes", { event: "UPDATE", schema: "public", table: "families", filter: "id=eq." + fam.id },
+    p => { fam.textOn = p.new.text_enabled !== false; fam.name = p.new.name; if (onLive) onLive("families", p); });
   liveCh.subscribe();
 }
 async function paintLast() {
   const { data } = await sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(1);
   const m = data && data[0], el = $("#last");
-  if (el) el.innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body || "写真を送りました")}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
+  if (el) el.innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body || (m.stamp ? "スタンプを送りました" : "写真を送りました"))}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
 }
 async function paintToday() {
   const t = new Date(), a = new Date(t.getFullYear(), t.getMonth(), t.getDate());
