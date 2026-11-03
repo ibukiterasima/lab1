@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://*.supabase.co; connect-src https://*.supabase.co wss://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
 <title>かぞくの窓(試作品)</title>
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
 <style>
@@ -98,7 +100,7 @@ const pwOf = e => "kzm-" + e.toLowerCase() + "-proto";
 function authView() {
   set(`<h1>${ic("home")} かぞくの窓</h1><div class="card">
     <h2>メールアドレスを入れてください</h2>
-    <label>メールアドレス</label><input id="em" type="email" autocomplete="email" inputmode="email" placeholder="例:taro@example.com">
+    <label>メールアドレス</label><input id="em" maxlength="254" type="email" autocomplete="email" inputmode="email" placeholder="例:taro@example.com">
     <p class="err" id="err"></p>
     <div class="big"><button id="go">はじめる</button></div></div>`);
   const go = async () => {
@@ -142,9 +144,9 @@ async function ensure() {
 }
 function familyView() {
   set(`<h1>${ic("home")} かぞくの窓</h1><div class="card">
-    <label>あなたのお名前(家族に表示されます)</label><input id="nm" placeholder="例:おばあちゃん">
-    <label>家族の名前(作る場合)</label><input id="fn" placeholder="例:山田家">
-    <label>招待コード(参加する場合)</label><input id="cd" placeholder="6文字のコード" autocapitalize="characters">
+    <label>あなたのお名前(家族に表示されます)</label><input id="nm" maxlength="30" placeholder="例:おばあちゃん">
+    <label>家族の名前(作る場合)</label><input id="fn" maxlength="40" placeholder="例:山田家">
+    <label>招待コード(参加する場合)</label><input id="cd" maxlength="12" placeholder="6文字のコード" autocapitalize="characters">
     <p class="err" id="err"></p>
     <div class="big"><button id="mk">新しく作る</button><button class="sub" id="jn">コードで参加する</button>
     ${me ? '<button class="sub" id="lo">ログアウト</button>' : ""}</div></div>`);
@@ -158,7 +160,7 @@ function familyView() {
   $("#jn").onclick = async () => {
     const nm = $("#nm").value.trim(), cd = $("#cd").value.trim();
     if (!nm || !cd) return $("#err").textContent = "お名前と招待コードを入れてください";
-    let error; try { await ensure(); ({ error } = await sb.rpc("join_family", { code: cd, my_name: nm, my_icon: icon() })); } catch (e) { error = e; }
+    let error; try { await ensure(); { const r = await sb.rpc("join_family", { code: cd, my_name: nm, my_icon: icon() }); error = r.error || (r.data ? null : { message: "招待コードが見つかりません" }); } } catch (e) { error = e; }
     error ? $("#err").textContent = jmsg(error) : start();
   };
   $("#lo") && ($("#lo").onclick = async () => { killLive(); await sb.auth.signOut(); me = null; authView(); });
@@ -202,7 +204,7 @@ async function chatView() {
   set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>家族のチャット</h2></div>
     <div class="card" style="padding:12px"><div id="log"></div></div>
     <p class="hide" id="hint">いまは、写真とスタンプだけ送れます。</p><div class="card hide" id="tray"><div class="stg" id="stg"></div></div>
-    <div class="send" id="bar"><input id="ci" type="file" accept="image/*" class="hide"><button class="sub" id="cb" aria-label="写真を送る">${ic("camera")}<span class="lb">写真</span></button><button class="sub" id="sk" aria-label="スタンプを送る">${ic("smile")}<span class="lb">スタンプ</span></button><input id="tx" placeholder="メッセージを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
+    <div class="send" id="bar"><input id="ci" type="file" accept="image/*" class="hide"><button class="sub" id="cb" aria-label="写真を送る">${ic("camera")}<span class="lb">写真</span></button><button class="sub" id="sk" aria-label="スタンプを送る">${ic("smile")}<span class="lb">スタンプ</span></button><input id="tx" maxlength="1000" placeholder="メッセージを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
   const log = $("#log"), seen = new Set();
   const paintComposer = () => { $("#tx").classList.toggle("hide", !fam.textOn); $("#sd").classList.toggle("hide", !fam.textOn);
     $("#bar").classList.toggle("notext", !fam.textOn); $("#hint").classList.toggle("hide", fam.textOn); };
@@ -256,6 +258,7 @@ async function chatView() {
 
 const fmt = t => new Date(t).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 async function shrink(file, max = 1280) {
+  if ((file.type && !/^image\//.test(file.type)) || file.size > 30e6) throw new Error("bad file");
   const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
   const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const c = document.createElement("canvas");
@@ -300,7 +303,7 @@ async function photoDetail(p, url) {
     <div>${av(u.icon)} <b>${esc(u.display_name)}</b>さん ・ ${fmt(p.created_at)}</div>
     <button class="sub" id="dl">${ic("download")} スマホに保存</button>
     <div class="card"><h2>${ic("chat")} コメント</h2><div id="cm">読み込み中…</div></div>
-    <div class="send"><input id="tx" placeholder="コメントを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
+    <div class="send"><input id="tx" maxlength="500" placeholder="コメントを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
   $("#bk").onclick = photoView;
   $("#dl").onclick = () => saveToPhone(url);
   onLive = (t, pl) => { if (t === "photo_comments" || t === "members") draw(); else if (t === "photos" && pl.eventType === "DELETE" && pl.old.id === p.id) photoView(); };
@@ -374,7 +377,7 @@ function eventForm(ev, ds) {
   const date = d ? ymd(d) : ds, time = d ? `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "10:00";
   const opts = `<option value="">みんな</option>` + Object.values(members).map(u => `<option value="${esc(u.user_id)}">${esc(u.display_name)}</option>`).join("");
   set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>${ev ? "予定をなおす" : "予定を入れる"}</h2></div>
-    <div class="card"><label>予定の内容</label><input id="ti" placeholder="例:病院、誕生日会">
+    <div class="card"><label>予定の内容</label><input id="ti" maxlength="100" placeholder="例:病院、誕生日会">
     <label>日にち</label><input id="dt" type="date"><label>時間</label><input id="hv" type="time">
     <label>だれの予定</label><select id="wh">${opts}</select><p class="err" id="err"></p></div>
     <div class="big"><button id="sv">保存する</button>${ev ? `<button class="sub" id="rm">${ic("trash")} 予定をけす</button>` : ""}</div>`);
@@ -394,7 +397,7 @@ function eventForm(ev, ds) {
 function settingsView() {
   let icon = fam.my.icon;
   set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>設定</h2></div>
-    <div class="card"><label>お名前</label><input id="nm" autocomplete="off">
+    <div class="card"><label>お名前</label><input id="nm" maxlength="30" autocomplete="off">
     <label>アイコン</label><div id="cur" style="font-size:3.2rem"></div><div class="icg" id="ics"></div>
     <input id="fi" type="file" accept="image/*" class="hide">
     <div class="big" style="margin-top:12px"><button class="sub" id="up">${ic("camera")} 写真をえらぶ</button></div></div>
@@ -402,9 +405,14 @@ function settingsView() {
   $("#nm").value = fam.my.display_name;
   $("#sv").parentElement.insertAdjacentHTML("beforebegin", `<div class="card"><label>文字の大きさ</label><div class="tabs" id="fs"></div></div>`);
   if (fam.admin) {
-    $("#sv").parentElement.insertAdjacentHTML("beforebegin", `<div class="card"><label>チャットで送れるもの(管理者のみ)</label><div class="tabs" id="tx2"></div><p class="err" id="tm2"></p></div>`);
+    $("#sv").parentElement.insertAdjacentHTML("beforebegin", `<div class="card"><label>チャットで送れるもの(管理者のみ)</label><div class="tabs" id="tx2"></div><div class="big" style="margin-top:12px"><button class="sub" id="rg">招待コードを新しくする</button></div><p class="err" id="tm2" role="status"></p></div>`);
     const td = () => { $("#tx2").innerHTML = [[true, "文字・写真・スタンプ"], [false, "写真とスタンプだけ"]].map(([v, l]) => `<button data-v="${v}" class="sub ${fam.textOn === v ? "on" : ""}">${l}</button>`).join(""); };
     td();
+    $("#rg").onclick = async () => {
+      if (!await ask("招待コードを新しくしますか?前のコードは使えなくなります。", "新しくする")) return;
+      const { data, error } = await sb.rpc("regenerate_invite", { fid: fam.id });
+      $("#tm2").textContent = error ? "変更できませんでした。" : "新しいコード:" + data;
+    };
     $("#tx2").onclick = async e => { const b = e.target.closest("button"); if (!b) return; const v = b.dataset.v === "true", old = fam.textOn; fam.textOn = v; td();
       const { error } = await sb.from("families").update({ text_enabled: v }).eq("id", fam.id);
       if (error) { fam.textOn = old; td(); $("#tm2").textContent = "変更できませんでした。"; } };
@@ -442,7 +450,7 @@ function settingsView() {
 }
 
 let liveCh = null, liveFam = null, onLive = null;
-function killLive() { if (liveCh) sb.removeChannel(liveCh); liveCh = null; liveFam = null; }
+function killLive() { Object.keys(sig).forEach(k => delete sig[k]); avUrl = {}; if (liveCh) sb.removeChannel(liveCh); liveCh = null; liveFam = null; }
 async function loadMembers() {
   const { data: ms } = await sb.from("members").select("user_id, display_name, icon").eq("family_id", fam.id);
   members = Object.fromEntries((ms || []).map(m => [m.user_id, m]));
