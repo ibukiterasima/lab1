@@ -32,6 +32,11 @@ button:focus-visible,input:focus-visible{outline:4px solid var(--text);outline-o
 .hide{display:none!important}
 @media (prefers-reduced-motion:no-preference){button{transition:transform .1s}button:active{transform:scale(.97)}}
 @media (max-width:420px){.clock .t{font-size:56px}}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.grid button{padding:0;min-height:0;background:none;border-radius:14px}
+.grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;border:3px solid var(--beige);display:block}
+.photo{width:100%;border-radius:16px;border:3px solid var(--beige);display:block}
+svg.ic{width:1.1em;height:1.1em;vertical-align:-.2em;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin-right:.2em}
 </style>
 </head>
 <body>
@@ -42,7 +47,10 @@ const sb = supabase.createClient(
   "https://onzezcpkdfynssnhmzbl.supabase.co",
   "sb_publishable_4PK7Wkl8JrFrOelSnMbAmw_2-M5IQk2");
 const $app = document.getElementById("app");
-const ICONS = ["🌸","🌻","🍀","🐶","🐱","🐰","🍎","🌈","⭐","🐻"];
+const SVG = {"home": "<path d=\"M3 11l9-8 9 8M5 10v10h14V10M10 20v-6h4v6\"/>", "chat": "<path d=\"M4 5h16v11H9l-5 4z\"/>", "camera": "<path d=\"M3 8h4l2-3h6l2 3h4v12H3z\"/><circle cx=\"12\" cy=\"13\" r=\"4\"/>", "users": "<circle cx=\"9\" cy=\"8\" r=\"3\"/><path d=\"M3 20c0-3.5 3-6 6-6s6 2.5 6 6\"/><circle cx=\"17\" cy=\"9\" r=\"2.5\"/><path d=\"M16 14c3 0 5 2 5 5\"/>", "trash": "<path d=\"M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13\"/>", "back": "<path d=\"M15 5l-7 7 7 7\"/>", "star": "<path d=\"M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z\"/>", "heart": "<path d=\"M12 20s-8-5-8-11a4.5 4.5 0 018-2.5A4.5 4.5 0 0120 9c0 6-8 11-8 11z\"/>", "sun": "<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2\"/>", "leaf": "<path d=\"M5 19C5 10 10 5 20 4c0 10-5 15-14 15zM5 19l8-8\"/>", "flower": "<circle cx=\"12\" cy=\"12\" r=\"2.5\"/><circle cx=\"12\" cy=\"6.5\" r=\"3\"/><circle cx=\"12\" cy=\"17.5\" r=\"3\"/><circle cx=\"6.5\" cy=\"12\" r=\"3\"/><circle cx=\"17.5\" cy=\"12\" r=\"3\"/>", "moon": "<path d=\"M20 14A8 8 0 1110 4a6.5 6.5 0 0010 10z\"/>", "cloud": "<path d=\"M7 18a4 4 0 010-8 5.5 5.5 0 0110.5 1.5A3.3 3.3 0 0117 18z\"/>", "apple": "<path d=\"M12 8c-3-2-7 0-7 5s3 8 7 7c4 1 7-2 7-7s-4-7-7-5zM12 8c0-2 1-4 3-4\"/>", "smile": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 14c1 2 3 3 4 3s3-1 4-3M9 10h.01M15 10h.01\"/>"};
+const ic = n => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${SVG[n] || SVG.smile}</svg>`;
+const av = n => ic(SVG[n] ? n : "smile");
+const ICONS = ["flower","leaf","star","heart","sun","moon","cloud","apple","smile"];
 let me, fam, members = {}, chan, tick;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const jmsg = e => (e && e.message || "うまくいきませんでした").replace(/Invalid login credentials/,"メールアドレスかパスワードが違います").replace(/User already registered/,"このメールアドレスは登録済みです").replace(/Password should be at least.*/,"パスワードは6文字以上にしてください");
@@ -52,7 +60,7 @@ const $ = s => $app.querySelector(s);
 // 試作品用:メールアドレスだけでログイン(メール送信・確認なし)。本番では使わないこと。
 const pwOf = e => "kzm-" + e.toLowerCase() + "-proto";
 function authView() {
-  set(`<h1>🏠 かぞくの窓</h1><div class="card">
+  set(`<h1>${ic("home")} かぞくの窓</h1><div class="card">
     <h2>メールアドレスを入れてください</h2>
     <label>メールアドレス</label><input id="em" type="email" autocomplete="email" inputmode="email" placeholder="例:taro@example.com">
     <p class="err" id="err"></p>
@@ -92,7 +100,7 @@ async function ensure() {
   me = data.user;
 }
 function familyView() {
-  set(`<h1>🏠 かぞくの窓</h1><div class="card">
+  set(`<h1>${ic("home")} かぞくの窓</h1><div class="card">
     <label>あなたのお名前(家族に表示されます)</label><input id="nm" placeholder="例:おばあちゃん">
     <label>家族の名前(作る場合)</label><input id="fn" placeholder="例:山田家">
     <label>招待コード(参加する場合)</label><input id="cd" placeholder="6文字のコード" autocapitalize="characters">
@@ -116,12 +124,13 @@ function familyView() {
 }
 
 function homeView() {
-  set(`<div class="row"><h2>${esc(fam.my.icon)} ${esc(fam.my.display_name)}さん</h2><span>${esc(fam.name)}</span></div>
+  set(`<div class="row"><h2>${av(fam.my.icon)} ${esc(fam.my.display_name)}さん</h2><span>${esc(fam.name)}</span></div>
     <div class="card clock"><div class="t" id="tm"></div><div class="d" id="dt"></div></div>
-    <div class="card"><h2>💬 いちばん新しいメッセージ</h2><div id="last">読み込み中…</div></div>
-    <div class="big"><button id="chat">💬 家族とおしゃべり</button>
-    <button class="sub" id="inv">👨‍👩‍👧 家族を招待する</button>
-    <button class="sub" id="lo">やめる</button></div><div id="invbox"></div>`);
+    <div class="card"><h2>${ic("chat")} いちばん新しいメッセージ</h2><div id="last">読み込み中…</div></div>
+    <div class="big"><button id="chat">${ic("chat")} 家族とおしゃべり</button>
+    <button id="ph">${ic("camera")} 家族の写真</button>
+    <button class="sub" id="inv">${ic("users")} 家族を招待する</button>
+    <button class="sub" id="lo">ログアウト</button></div><div id="invbox"></div>`);
   const draw = () => {
     const n = new Date();
     $("#tm").textContent = n.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
@@ -133,6 +142,7 @@ function homeView() {
     $("#last").innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body)}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
   });
   $("#chat").onclick = chatView;
+  $("#ph").onclick = photoView;
   $("#lo").onclick = async () => { await sb.auth.signOut(); me = null; authView(); };
   $("#inv").onclick = async () => {
     const { data } = await sb.rpc("my_invite_code", { fid: fam.id });
@@ -141,14 +151,14 @@ function homeView() {
 }
 
 async function chatView() {
-  set(`<div class="row"><button class="sub" id="bk">← もどる</button><h2>家族のチャット</h2></div>
+  set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>家族のチャット</h2></div>
     <div class="card" style="padding:12px"><div id="log"></div></div>
     <div class="send"><input id="tx" placeholder="メッセージを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
   const log = $("#log");
   const add = m => {
-    const mine = m.user_id === me.id, u = members[m.user_id] || { display_name: "家族", icon: "🙂" };
+    const mine = m.user_id === me.id, u = members[m.user_id] || { display_name: "家族", icon: "smile" };
     const t = new Date(m.created_at).toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
-    log.insertAdjacentHTML("beforeend", `<div class="m ${mine ? "me" : ""}"><div class="who">${esc(u.icon)} ${esc(u.display_name)}</div><div class="b">${esc(m.body)}</div><div class="tm">${t}</div></div>`);
+    log.insertAdjacentHTML("beforeend", `<div class="m ${mine ? "me" : ""}"><div class="who">${av(u.icon)} ${esc(u.display_name)}</div><div class="b">${esc(m.body)}</div><div class="tm">${t}</div></div>`);
     log.scrollTop = log.scrollHeight;
   };
   const { data } = await sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(50);
@@ -164,6 +174,74 @@ async function chatView() {
   $("#sd").onclick = send;
   $("#tx").onkeydown = e => { if (e.key === "Enter" && !e.isComposing) send(); };
   $("#bk").onclick = start;
+}
+
+const fmt = t => new Date(t).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+async function shrink(file, max = 1280) {
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+  return new Promise(r => c.toBlob(r, "image/jpeg", 0.8));
+}
+async function photoView() {
+  set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>家族の写真</h2></div>
+    <input id="fi" type="file" accept="image/*" multiple class="hide">
+    <button id="up">${ic("camera")} 写真をのせる</button><p class="err" id="err"></p><div class="grid" id="gr">読み込み中…</div>`);
+  $("#bk").onclick = start;
+  $("#up").onclick = () => $("#fi").click();
+  $("#fi").onchange = async e => {
+    const files = [...e.target.files]; let i = 0;
+    for (const f of files) {
+      $("#err").textContent = `送っています…(${++i}/${files.length})`;
+      try {
+        const blob = await shrink(f);
+        const path = `${fam.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+        const u = await sb.storage.from("photos").upload(path, blob, { contentType: "image/jpeg" });
+        if (u.error) throw u.error;
+        const r = await sb.from("photos").insert({ family_id: fam.id, user_id: me.id, path });
+        if (r.error) throw r.error;
+      } catch (x) { $("#err").textContent = "のせられない写真がありました。"; return photoView(); }
+    }
+    photoView();
+  };
+  const { data } = await sb.from("photos").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(60);
+  const gr = $("#gr");
+  if (!data || !data.length) return gr.textContent = "まだ写真がありません。最初の1枚をのせてみましょう。";
+  const { data: urls } = await sb.storage.from("photos").createSignedUrls(data.map(p => p.path), 3600);
+  const um = Object.fromEntries((urls || []).map(x => [x.path, x.signedUrl]));
+  gr.innerHTML = data.map((p, i) => `<button data-i="${i}" aria-label="写真を大きく見る"><img src="${esc(um[p.path])}" alt="家族の写真" loading="lazy"></button>`).join("");
+  gr.onclick = e => { const b = e.target.closest("button"); if (b) photoDetail(data[b.dataset.i], um[data[b.dataset.i].path]); };
+}
+async function photoDetail(p, url) {
+  const u = members[p.user_id] || { display_name: "家族", icon: "smile" };
+  set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button>${p.user_id === me.id ? '<button class="sub" id="rm">' + ic("trash") + ' けす</button>' : ""}</div>
+    <img class="photo" src="${esc(url)}" alt="家族の写真">
+    <div>${av(u.icon)} <b>${esc(u.display_name)}</b>さん ・ ${fmt(p.created_at)}</div>
+    <div class="card"><h2>${ic("chat")} コメント</h2><div id="cm">読み込み中…</div></div>
+    <div class="send"><input id="tx" placeholder="コメントを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
+  $("#bk").onclick = photoView;
+  if ($("#rm")) $("#rm").onclick = async () => {
+    if (!confirm("この写真をけしますか?")) return;
+    await sb.from("photos").delete().eq("id", p.id);
+    await sb.storage.from("photos").remove([p.path]);
+    photoView();
+  };
+  const draw = async () => {
+    const { data } = await sb.from("photo_comments").select("*").eq("photo_id", p.id).order("created_at");
+    $("#cm").innerHTML = (data && data.length) ? data.map(c => { const w = members[c.user_id] || { display_name: "家族", icon: "smile" };
+      return `<p style="margin:8px 0"><b>${av(w.icon)} ${esc(w.display_name)}</b>:${esc(c.body)}<br><small>${fmt(c.created_at)}</small></p>`; }).join("") : "まだコメントはありません。";
+  };
+  draw();
+  const send = async () => {
+    const body = $("#tx").value.trim(); if (!body) return;
+    const { error } = await sb.from("photo_comments").insert({ photo_id: p.id, family_id: fam.id, user_id: me.id, body });
+    if (error) return $("#err").textContent = "送れませんでした。もう一度お試しください。";
+    $("#tx").value = ""; draw();
+  };
+  $("#sd").onclick = send;
+  $("#tx").onkeydown = e => { if (e.key === "Enter" && !e.isComposing) send(); };
 }
 
 start();
