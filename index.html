@@ -7,31 +7,32 @@
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#F8F4EC;--beige:#D9C9B5;--green:#91A88B;--text:#665747;--white:#fffdf8}
+html{font-size:24px}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{background:var(--bg);color:var(--text);font:500 20px/1.6 "Zen Maru Gothic","Hiragino Maru Gothic ProN","Meiryo",sans-serif}
+body{background:var(--bg);color:var(--text);font:500 1rem/1.6 "Zen Maru Gothic","Hiragino Maru Gothic ProN","Meiryo",sans-serif}
 #app{max-width:720px;margin:0 auto;min-height:100%;padding:16px;display:flex;flex-direction:column;gap:16px}
-h1{font-size:30px;margin:8px 0}h2{font-size:24px;margin:0}
-input,select{width:100%;font:inherit;font-size:22px;padding:14px;border:3px solid var(--beige);border-radius:14px;background:var(--white);color:var(--text)}
+h1{font-size:1.5rem;margin:8px 0}h2{font-size:1.2rem;margin:0}
+input,select{width:100%;font:inherit;font-size:1.1rem;padding:14px;border:3px solid var(--beige);border-radius:14px;background:var(--white);color:var(--text)}
 label{display:block;font-weight:700;margin:12px 0 4px}
-button{font:700 22px inherit;font-family:inherit;min-height:60px;padding:12px 20px;border:0;border-radius:16px;background:var(--green);color:#fff;cursor:pointer}
+button{font:700 22px inherit;font-family:inherit;min-height:3rem;padding:12px 20px;border:0;border-radius:16px;background:var(--green);color:#fff;cursor:pointer}
 button.sub{background:var(--beige);color:var(--text)}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid var(--text);outline-offset:2px}
 .card{background:var(--white);border:3px solid var(--beige);border-radius:20px;padding:20px}
-.clock{text-align:center}.clock .t{font-size:72px;font-weight:700;line-height:1.1}.clock .d{font-size:26px}
-.big{display:grid;gap:12px}.big button{width:100%;font-size:26px;min-height:76px}
+.clock{text-align:center}.clock .t{font-size:min(3.6rem,17vw);font-weight:700;line-height:1.1}.clock .d{font-size:1.3rem}
+.big{display:grid;gap:12px}.big button{width:100%;font-size:1.3rem;min-height:3.8rem}
 .err{color:#a3401f;font-weight:700;min-height:1.6em}
 .row{display:flex;gap:10px;align-items:center;justify-content:space-between}
 #log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:4px;max-height:60vh}
 .m{max-width:85%;padding:10px 14px;border-radius:18px;background:var(--white);border:2px solid var(--beige)}
 .m.me{align-self:flex-end;background:var(--green);color:#fff;border-color:var(--green)}
-.m .who{font-size:16px;opacity:.85}.m .tm{font-size:14px;opacity:.75;text-align:right}
-.m .b{font-size:24px;white-space:pre-wrap;word-break:break-word}
+.m .who{font-size:.9rem;opacity:.85}.m .tm{font-size:.8rem;opacity:.75;text-align:right}
+.m .b{font-size:1.2rem;white-space:pre-wrap;word-break:break-word}
 .send{display:flex;gap:8px}.send input{flex:1}
-.code{font-size:34px;letter-spacing:.2em;font-weight:700}
+.code{font-size:1.7rem;letter-spacing:.2em;font-weight:700}
 .hide{display:none!important}
 @media (prefers-reduced-motion:no-preference){button{transition:transform .1s}button:active{transform:scale(.97)}}
-@media (max-width:420px){.clock .t{font-size:56px}}
+
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .grid button{padding:0;min-height:0;background:none;border-radius:14px}
 .grid img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px;border:3px solid var(--beige);display:block}
@@ -39,14 +40,19 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:4px solid 
 svg.ic{width:1.1em;height:1.1em;vertical-align:-.2em;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin-right:.2em}
 .av{width:1.4em;height:1.4em;border-radius:50%;object-fit:cover;vertical-align:-.3em;margin-right:.2em;border:2px solid var(--beige)}
 .cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
-.cal button{min-height:56px;padding:4px;font-size:20px;background:var(--white);color:var(--text);border:2px solid var(--beige);border-radius:10px}
+.cal button{min-height:2.8rem;padding:4px;font-size:.9rem;background:var(--white);color:var(--text);border:2px solid var(--beige);border-radius:10px}
 .cal .today{border:4px solid var(--green)}.cal .sel{background:var(--green);color:#fff}
 .cal .dot{display:block;height:8px;width:8px;border-radius:50%;background:var(--green);margin:2px auto 0}.cal .sel .dot{background:#fff}
-.tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs button{flex:1;min-height:52px;font-size:20px}
-.ev{width:100%;text-align:left;margin-top:8px;font-size:22px;font-weight:500}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}.tabs button{flex:1;min-height:2.6rem;font-size:1rem}
+.ev{width:100%;text-align:left;margin-top:8px;font-size:1.1rem;font-weight:500}
 .icg{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px}
-.icg button{min-height:72px;font-size:40px;background:var(--white);color:var(--text);border:3px solid var(--beige);padding:0}
+.icg button{min-height:3.6rem;font-size:2rem;background:var(--white);color:var(--text);border:3px solid var(--beige);padding:0}
 .icg .on{border-color:var(--green);background:#e8efe6}
+small{font-size:.85em}
+.tabs .on{background:var(--green);color:#fff}
+button.danger,.danger{background:#b5593a;color:#fff}
+.ov{position:fixed;inset:0;z-index:10;background:rgba(102,87,71,.6);display:flex;align-items:center;justify-content:center;padding:16px}
+.ov .card{max-width:560px;width:100%}
 </style>
 </head>
 <body>
@@ -57,6 +63,9 @@ const sb = supabase.createClient(
   "https://onzezcpkdfynssnhmzbl.supabase.co",
   "sb_publishable_4PK7Wkl8JrFrOelSnMbAmw_2-M5IQk2");
 const $app = document.getElementById("app");
+const FS = { "ふつう": 24, "大きい": 28, "とても大きい": 32 };
+let curFs = 24; try { curFs = +localStorage.getItem("fs") || 24; } catch (e) {}
+document.documentElement.style.fontSize = curFs + "px";
 const SVG = {"home": "<path d=\"M3 11l9-8 9 8M5 10v10h14V10M10 20v-6h4v6\"/>", "chat": "<path d=\"M4 5h16v11H9l-5 4z\"/>", "camera": "<path d=\"M3 8h4l2-3h6l2 3h4v12H3z\"/><circle cx=\"12\" cy=\"13\" r=\"4\"/>", "users": "<circle cx=\"9\" cy=\"8\" r=\"3\"/><path d=\"M3 20c0-3.5 3-6 6-6s6 2.5 6 6\"/><circle cx=\"17\" cy=\"9\" r=\"2.5\"/><path d=\"M16 14c3 0 5 2 5 5\"/>", "trash": "<path d=\"M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13\"/>", "back": "<path d=\"M15 5l-7 7 7 7\"/>", "star": "<path d=\"M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z\"/>", "heart": "<path d=\"M12 20s-8-5-8-11a4.5 4.5 0 018-2.5A4.5 4.5 0 0120 9c0 6-8 11-8 11z\"/>", "sun": "<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2\"/>", "leaf": "<path d=\"M5 19C5 10 10 5 20 4c0 10-5 15-14 15zM5 19l8-8\"/>", "flower": "<circle cx=\"12\" cy=\"12\" r=\"2.5\"/><circle cx=\"12\" cy=\"6.5\" r=\"3\"/><circle cx=\"12\" cy=\"17.5\" r=\"3\"/><circle cx=\"6.5\" cy=\"12\" r=\"3\"/><circle cx=\"17.5\" cy=\"12\" r=\"3\"/>", "moon": "<path d=\"M20 14A8 8 0 1110 4a6.5 6.5 0 0010 10z\"/>", "cloud": "<path d=\"M7 18a4 4 0 010-8 5.5 5.5 0 0110.5 1.5A3.3 3.3 0 0117 18z\"/>", "apple": "<path d=\"M12 8c-3-2-7 0-7 5s3 8 7 7c4 1 7-2 7-7s-4-7-7-5zM12 8c0-2 1-4 3-4\"/>", "smile": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M8 14c1 2 3 3 4 3s3-1 4-3M9 10h.01M15 10h.01\"/>"};
 Object.assign(SVG, {
   calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
@@ -72,7 +81,7 @@ const ICONS = ["flower","leaf","star","heart","sun","moon","cloud","apple","smil
 let me, fam, members = {}, chan, tick;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const jmsg = e => (e && e.message || "うまくいきませんでした").replace(/Invalid login credentials/,"メールアドレスかパスワードが違います").replace(/User already registered/,"このメールアドレスは登録済みです").replace(/Password should be at least.*/,"パスワードは6文字以上にしてください");
-const set = h => { clearInterval(tick); if (chan) { sb.removeChannel(chan); chan = null; } $app.innerHTML = h; };
+const set = h => { onLive = null; clearInterval(tick); if (chan) { sb.removeChannel(chan); chan = null; } $app.innerHTML = h; };
 const $ = s => $app.querySelector(s);
 
 // 試作品用:メールアドレスだけでログイン(メール送信・確認なし)。本番では使わないこと。
@@ -112,6 +121,7 @@ async function start() {
   const ph = [...new Set(Object.values(members).map(m => m.icon).filter(i => i && i.startsWith("photo:")).map(i => i.slice(6)))];
   avUrl = {};
   if (ph.length) { const { data: u } = await sb.storage.from("photos").createSignedUrls(ph, 3600); (u || []).forEach(x => avUrl[x.path] = x.signedUrl); }
+  startLive();
   homeView();
 }
 
@@ -142,7 +152,7 @@ function familyView() {
     let error; try { await ensure(); ({ error } = await sb.rpc("join_family", { code: cd, my_name: nm, my_icon: icon() })); } catch (e) { error = e; }
     error ? $("#err").textContent = jmsg(error) : start();
   };
-  $("#lo") && ($("#lo").onclick = async () => { await sb.auth.signOut(); me = null; authView(); });
+  $("#lo") && ($("#lo").onclick = async () => { killLive(); await sb.auth.signOut(); me = null; authView(); });
 }
 
 function homeView() {
@@ -169,9 +179,10 @@ function homeView() {
   $("#chat").onclick = chatView;
   $("#ph").onclick = photoView;
   $("#cl").onclick = () => calView(); $("#st").onclick = settingsView;
+  onLive = t => { if (t === "members") homeView(); else if (t === "events") paintToday(); else if (t === "messages") paintLast(); };
   { const t = new Date(), a = new Date(t.getFullYear(), t.getMonth(), t.getDate());
     evq(a, addDays(a, 1)).then(({ data }) => { $("#today").innerHTML = (data && data.length) ? data.map(e => `<div><b>${hm(e.starts_at)}</b> ${esc(e.title)} <small>(${esc(who(e))})</small></div>`).join("") : "今日の予定はありません。"; }); }
-  $("#lo").onclick = async () => { await sb.auth.signOut(); me = null; authView(); };
+  $("#lo").onclick = async () => { killLive(); await sb.auth.signOut(); me = null; authView(); };
   $("#inv").onclick = async () => {
     const { data } = await sb.rpc("my_invite_code", { fid: fam.id });
     $("#invbox").innerHTML = `<div class="card" style="text-align:center">家族にこのコードを伝えてください<div class="code">${esc(data)}</div></div>`;
@@ -234,6 +245,7 @@ async function photoView() {
     }
     photoView();
   };
+  onLive = t => { if (t === "photos" || t === "members") photoView(); };
   const { data } = await sb.from("photos").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(60);
   const gr = $("#gr");
   if (!data || !data.length) return gr.textContent = "まだ写真がありません。最初の1枚をのせてみましょう。";
@@ -250,8 +262,9 @@ async function photoDetail(p, url) {
     <div class="card"><h2>${ic("chat")} コメント</h2><div id="cm">読み込み中…</div></div>
     <div class="send"><input id="tx" placeholder="コメントを入力" autocomplete="off"><button id="sd">送る</button></div><p class="err" id="err"></p>`);
   $("#bk").onclick = photoView;
+  onLive = (t, pl) => { if (t === "photo_comments" || t === "members") draw(); else if (t === "photos" && pl.eventType === "DELETE" && pl.old.id === p.id) photoView(); };
   if ($("#rm")) $("#rm").onclick = async () => {
-    if (!confirm("この写真をけしますか?")) return;
+    if (!await ask("この写真をけしますか?", "けす")) return;
     await sb.from("photos").delete().eq("id", p.id);
     await sb.storage.from("photos").remove([p.path]);
     photoView();
@@ -289,6 +302,7 @@ async function calView(cur = new Date(), rng = null) {
     <div class="card"><h2>${esc(rng.label)}の予定</h2><div id="ls">読み込み中…</div></div>
     <button id="ad">${ic("plus")} 予定を入れる</button>`);
   $("#bk").onclick = start;
+  onLive = t => { if (t === "events" || t === "members") calView(cur, rng); };
   $("#pv").onclick = () => calView(new Date(y, m - 1, 1));
   $("#nx").onclick = () => calView(new Date(y, m + 1, 1));
   $("#ad").onclick = () => eventForm(null, ymd(rng.a));
@@ -333,18 +347,23 @@ function eventForm(ev, ds) {
     const r = ev ? await sb.from("events").update(row).eq("id", ev.id) : await sb.from("events").insert({ ...row, family_id: fam.id, created_by: me.id });
     r.error ? $("#err").textContent = "保存できませんでした。もう一度お試しください。" : calView(at);
   };
-  if (ev) $("#rm").onclick = async () => { if (confirm("この予定をけしますか?")) { await sb.from("events").delete().eq("id", ev.id); calView(d); } };
+  if (ev) $("#rm").onclick = async () => { if (await ask("この予定をけしますか?", "けす")) { await sb.from("events").delete().eq("id", ev.id); calView(d); } };
 }
 
 function settingsView() {
   let icon = fam.my.icon;
   set(`<div class="row"><button class="sub" id="bk">${ic("back")} もどる</button><h2>設定</h2></div>
     <div class="card"><label>お名前</label><input id="nm" autocomplete="off">
-    <label>アイコン</label><div id="cur" style="font-size:64px"></div><div class="icg" id="ics"></div>
+    <label>アイコン</label><div id="cur" style="font-size:3.2rem"></div><div class="icg" id="ics"></div>
     <input id="fi" type="file" accept="image/*" class="hide">
     <div class="big" style="margin-top:12px"><button class="sub" id="up">${ic("camera")} 写真をえらぶ</button></div></div>
     <p class="err" id="err"></p><div class="big"><button id="sv">保存する</button></div>`);
   $("#nm").value = fam.my.display_name;
+  $("#sv").parentElement.insertAdjacentHTML("beforebegin", `<div class="card"><label>文字の大きさ</label><div class="tabs" id="fs"></div></div>`);
+  const fd = () => { $("#fs").innerHTML = Object.keys(FS).map(k => `<button data-k="${k}" class="sub ${FS[k] === curFs ? "on" : ""}">${k}</button>`).join(""); };
+  fd();
+  $("#fs").onclick = e => { const b = e.target.closest("button"); if (!b) return; curFs = FS[b.dataset.k];
+    document.documentElement.style.fontSize = curFs + "px"; try { localStorage.setItem("fs", curFs); } catch (x) {} fd(); };
   const draw = () => {
     $("#cur").innerHTML = av(icon);
     $("#ics").innerHTML = ICONS.map(k => `<button data-k="${k}" class="${k === icon ? "on" : ""}" aria-label="アイコンをえらぶ">${ic(k)}</button>`).join("");
@@ -371,6 +390,46 @@ function settingsView() {
     if (old && old.startsWith("photo:") && old !== icon) sb.storage.from("photos").remove([old.slice(6)]);
     start();
   };
+}
+
+let liveCh = null, liveFam = null, onLive = null;
+function killLive() { if (liveCh) sb.removeChannel(liveCh); liveCh = null; liveFam = null; }
+async function loadMembers() {
+  const { data: ms } = await sb.from("members").select("user_id, display_name, icon").eq("family_id", fam.id);
+  members = Object.fromEntries((ms || []).map(m => [m.user_id, m]));
+  fam.my = members[me.id] || fam.my;
+  const ph = [...new Set(Object.values(members).map(m => m.icon).filter(i => i && i.startsWith("photo:")).map(i => i.slice(6)))];
+  avUrl = {};
+  if (ph.length) { const { data: u } = await sb.storage.from("photos").createSignedUrls(ph, 3600); (u || []).forEach(x => avUrl[x.path] = x.signedUrl); }
+}
+function startLive() {
+  if (liveCh && liveFam === fam.id) return;
+  killLive(); liveFam = fam.id;
+  liveCh = sb.channel("live-" + fam.id);
+  ["messages", "photos", "photo_comments", "events", "members"].forEach(t =>
+    liveCh.on("postgres_changes", { event: "*", schema: "public", table: t, filter: "family_id=eq." + fam.id },
+      async p => { if (t === "members") await loadMembers(); if (onLive) onLive(t, p); }));
+  liveCh.subscribe();
+}
+async function paintLast() {
+  const { data } = await sb.from("messages").select("*").eq("family_id", fam.id).order("created_at", { ascending: false }).limit(1);
+  const m = data && data[0], el = $("#last");
+  if (el) el.innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body)}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
+}
+async function paintToday() {
+  const t = new Date(), a = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  const { data } = await evq(a, addDays(a, 1)), el = $("#today");
+  if (el) el.innerHTML = (data && data.length) ? data.map(e => `<div><b>${hm(e.starts_at)}</b> ${esc(e.title)} <small>(${esc(who(e))})</small></div>`).join("") : "今日の予定はありません。";
+}
+function ask(msg, ok = "はい") {
+  return new Promise(res => {
+    const o = document.createElement("div"); o.className = "ov"; o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true");
+    o.innerHTML = `<div class="card"><h2>${esc(msg)}</h2><div class="big" style="margin-top:16px"><button class="sub" id="no">もどる</button><button class="danger" id="yes">${esc(ok)}</button></div></div>`;
+    document.body.appendChild(o);
+    const done = v => { o.remove(); res(v); };
+    o.querySelector("#yes").onclick = () => done(true); o.querySelector("#no").onclick = () => done(false);
+    o.querySelector("#no").focus();
+  });
 }
 
 start();
