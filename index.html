@@ -49,23 +49,28 @@ const jmsg = e => (e && e.message || "うまくいきませんでした").replac
 const set = h => { clearInterval(tick); if (chan) { sb.removeChannel(chan); chan = null; } $app.innerHTML = h; };
 const $ = s => $app.querySelector(s);
 
-function authView(mode = "login") {
-  const reg = mode === "register";
+// 試作品用:メールアドレスだけでログイン(メール送信・確認なし)。本番では使わないこと。
+const pwOf = e => "kzm-" + e.toLowerCase() + "-proto";
+function authView() {
   set(`<h1>🏠 かぞくの窓</h1><div class="card">
-    <h2>${reg ? "はじめての方" : "ログイン"}</h2>
-    <label>メールアドレス</label><input id="em" type="email" autocomplete="email">
-    <label>パスワード(6文字以上)</label><input id="pw" type="password" autocomplete="${reg ? "new-password" : "current-password"}">
+    <h2>メールアドレスを入れてください</h2>
+    <label>メールアドレス</label><input id="em" type="email" autocomplete="email" inputmode="email" placeholder="例:taro@example.com">
     <p class="err" id="err"></p>
-    <div class="big"><button id="go">${reg ? "登録する" : "ログイン"}</button>
-    <button class="sub" id="sw">${reg ? "ログインへ戻る" : "はじめての方はこちら"}</button></div></div>`);
-  $("#sw").onclick = () => authView(reg ? "login" : "register");
-  $("#go").onclick = async () => {
-    const email = $("#em").value.trim(), password = $("#pw").value;
-    const r = reg ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
+    <div class="big"><button id="go">はじめる</button></div></div>`);
+  const go = async () => {
+    const email = $("#em").value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) return $("#err").textContent = "メールアドレスの形で入れてください";
+    $("#go").disabled = true;
+    const password = pwOf(email);
+    let r = await sb.auth.signInWithPassword({ email, password });
+    if (r.error) r = await sb.auth.signUp({ email, password });
+    $("#go").disabled = false;
     if (r.error) return $("#err").textContent = jmsg(r.error);
-    if (!r.data.session) return $("#err").textContent = "確認メールを送りました。メールのリンクを開いてからログインしてください。";
+    if (!r.data.session) return $("#err").textContent = "登録できませんでした。管理画面で「Confirm email」をオフにしてください。";
     start();
   };
+  $("#go").onclick = go;
+  $("#em").onkeydown = e => { if (e.key === "Enter" && !e.isComposing) go(); };
 }
 
 async function start() {
@@ -80,28 +85,34 @@ async function start() {
   homeView();
 }
 
+async function ensure() {
+  if (me) return;
+  const { data, error } = await sb.auth.signInAnonymously();
+  if (error) throw error;
+  me = data.user;
+}
 function familyView() {
-  set(`<h1>家族グループ</h1><div class="card">
+  set(`<h1>🏠 かぞくの窓</h1><div class="card">
     <label>あなたのお名前(家族に表示されます)</label><input id="nm" placeholder="例:おばあちゃん">
     <label>家族の名前(作る場合)</label><input id="fn" placeholder="例:山田家">
     <label>招待コード(参加する場合)</label><input id="cd" placeholder="6文字のコード" autocapitalize="characters">
     <p class="err" id="err"></p>
     <div class="big"><button id="mk">新しく作る</button><button class="sub" id="jn">コードで参加する</button>
-    <button class="sub" id="lo">ログアウト</button></div></div>`);
+    ${me ? '<button class="sub" id="lo">ログアウト</button>' : ""}</div></div>`);
   const icon = () => ICONS[Math.floor(Math.random() * ICONS.length)];
   $("#mk").onclick = async () => {
     const nm = $("#nm").value.trim(), fn = $("#fn").value.trim();
     if (!nm || !fn) return $("#err").textContent = "お名前と家族の名前を入れてください";
-    const { error } = await sb.rpc("create_family", { fname: fn, my_name: nm, my_icon: icon() });
+    let error; try { await ensure(); ({ error } = await sb.rpc("create_family", { fname: fn, my_name: nm, my_icon: icon() })); } catch (e) { error = e; }
     error ? $("#err").textContent = jmsg(error) : start();
   };
   $("#jn").onclick = async () => {
     const nm = $("#nm").value.trim(), cd = $("#cd").value.trim();
     if (!nm || !cd) return $("#err").textContent = "お名前と招待コードを入れてください";
-    const { error } = await sb.rpc("join_family", { code: cd, my_name: nm, my_icon: icon() });
+    let error; try { await ensure(); ({ error } = await sb.rpc("join_family", { code: cd, my_name: nm, my_icon: icon() })); } catch (e) { error = e; }
     error ? $("#err").textContent = jmsg(error) : start();
   };
-  $("#lo").onclick = async () => { await sb.auth.signOut(); authView(); };
+  $("#lo") && ($("#lo").onclick = async () => { await sb.auth.signOut(); me = null; authView(); });
 }
 
 function homeView() {
@@ -110,7 +121,7 @@ function homeView() {
     <div class="card"><h2>💬 いちばん新しいメッセージ</h2><div id="last">読み込み中…</div></div>
     <div class="big"><button id="chat">💬 家族とおしゃべり</button>
     <button class="sub" id="inv">👨‍👩‍👧 家族を招待する</button>
-    <button class="sub" id="lo">ログアウト</button></div><div id="invbox"></div>`);
+    <button class="sub" id="lo">やめる</button></div><div id="invbox"></div>`);
   const draw = () => {
     const n = new Date();
     $("#tm").textContent = n.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
@@ -122,7 +133,7 @@ function homeView() {
     $("#last").innerHTML = m ? `<b>${esc((members[m.user_id] || {}).display_name)}</b>:${esc(m.body)}` : "まだメッセージはありません。最初の一言を送ってみましょう。";
   });
   $("#chat").onclick = chatView;
-  $("#lo").onclick = async () => { await sb.auth.signOut(); authView(); };
+  $("#lo").onclick = async () => { await sb.auth.signOut(); me = null; authView(); };
   $("#inv").onclick = async () => {
     const { data } = await sb.rpc("my_invite_code", { fid: fam.id });
     $("#invbox").innerHTML = `<div class="card" style="text-align:center">家族にこのコードを伝えてください<div class="code">${esc(data)}</div></div>`;
